@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 
 const Signup = () => {
@@ -19,6 +20,10 @@ const Signup = () => {
     }
   });
 
+  const [loading, setLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
+  const navigate = useNavigate();
+
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
     if (name.startsWith('vehicle.')) {
@@ -38,52 +43,167 @@ const Signup = () => {
     }
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setErrorMsg('');
     try {
       const res = await axios.post('http://localhost:3002/signup', form);
       alert(res.data.message);
+      navigate('/login');
     } catch (err) {
-      alert('Signup failed');
+      setErrorMsg(
+        err.response?.data?.message ||
+        err.message ||
+        'Signup failed'
+      );
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <div style={{ padding: 20 }}>
-      <h2>Signup</h2>
-      <input name="name" placeholder="Name" onChange={handleChange} />
-      <br />
-      <input name="email" placeholder="Email" onChange={handleChange} />
-      <br />
-      <input name="phone" placeholder="Phone" onChange={handleChange} />
-      <br />
-      <input name="password" type="password" placeholder="Password" onChange={handleChange} />
-      <br />
-      <label>
-        <input type="checkbox" name="wantsToBeDriver" onChange={handleChange} />
-        I want to be a driver
-      </label>
-      <br />
+    <div style={{
+      padding: 24,
+      maxWidth: 400,
+      margin: "40px auto",
+      border: "1px solid #eee",
+      borderRadius: 10,
+      boxShadow: "0 2px 8px #eee"
+    }}>
+      <h2 style={{ textAlign: "center" }}>Signup</h2>
+      <form onSubmit={handleSubmit}>
+        <input
+          name="name"
+          placeholder="Name"
+          value={form.name}
+          onChange={handleChange}
+          required
+          style={{ width: "100%", marginBottom: 12, padding: 8 }}
+        />
+        <input
+          name="email"
+          type="email"
+          placeholder="Email"
+          value={form.email}
+          onChange={handleChange}
+          required
+          style={{ width: "100%", marginBottom: 12, padding: 8 }}
+        />
+        <input
+          name="phone"
+          placeholder="Phone"
+          value={form.phone}
+          onChange={handleChange}
+          required
+          style={{ width: "100%", marginBottom: 12, padding: 8 }}
+        />
+        <input
+          name="password"
+          type="password"
+          placeholder="Password"
+          value={form.password}
+          onChange={handleChange}
+          required
+          style={{ width: "100%", marginBottom: 12, padding: 8 }}
+        />
 
-      {form.wantsToBeDriver && (
-        <>
-          <input name="license" placeholder="License Number" onChange={handleChange} />
-          <br />
-          <input name="vehicle.plate" placeholder="License Plate" onChange={handleChange} />
-          <br />
-          <input name="vehicle.make" placeholder="Manufacturer" onChange={handleChange} />
-          <br />
-          <input name="vehicle.model" placeholder="Model" onChange={handleChange} />
-          <br />
-          <input name="vehicle.year" placeholder="Year" onChange={handleChange} />
-          <br />
-          <input name="vehicle.color" placeholder="Color" onChange={handleChange} />
-          <br />
-          <input name="vehicle.seats" placeholder="Seats" onChange={handleChange} />
-          <br />
-        </>
-      )}
+        <label style={{ display: "block", marginBottom: 12 }}>
+          <input
+            type="checkbox"
+            name="wantsToBeDriver"
+            checked={form.wantsToBeDriver}
+            onChange={handleChange}
+          />{' '}
+          I want to be a driver
+        </label>
 
-      <button onClick={handleSubmit}>Signup</button>
+        {form.wantsToBeDriver && (
+          <div style={{ marginLeft: 10, marginBottom: 12 }}>
+            <input
+              name="license"
+              placeholder="License Number"
+              value={form.license}
+              onChange={handleChange}
+              required
+              style={{ width: "100%", marginBottom: 8, padding: 8 }}
+            />
+            <input
+              name="vehicle.plate"
+              placeholder="License Plate"
+              value={form.vehicle.plate}
+              onChange={handleChange}
+              required
+              style={{ width: "100%", marginBottom: 8, padding: 8 }}
+            />
+            <input
+              name="vehicle.make"
+              placeholder="Manufacturer"
+              value={form.vehicle.make}
+              onChange={handleChange}
+              required
+              style={{ width: "100%", marginBottom: 8, padding: 8 }}
+            />
+            <input
+              name="vehicle.model"
+              placeholder="Model"
+              value={form.vehicle.model}
+              onChange={handleChange}
+              required
+              style={{ width: "100%", marginBottom: 8, padding: 8 }}
+            />
+            <input
+              name="vehicle.year"
+              placeholder="Year"
+              value={form.vehicle.year}
+              onChange={handleChange}
+              required
+              style={{ width: "100%", marginBottom: 8, padding: 8 }}
+            />
+            <input
+              name="vehicle.color"
+              placeholder="Color"
+              value={form.vehicle.color}
+              onChange={handleChange}
+              required
+              style={{ width: "100%", marginBottom: 8, padding: 8 }}
+            />
+            <input
+              name="vehicle.seats"
+              placeholder="Seats"
+              value={form.vehicle.seats}
+              onChange={handleChange}
+              required
+              style={{ width: "100%", marginBottom: 8, padding: 8 }}
+            />
+          </div>
+        )}
+
+        {errorMsg && (
+          <div style={{ color: "red", marginBottom: 12 }}>
+            {errorMsg}
+          </div>
+        )}
+
+        <button
+          type="submit"
+          disabled={loading}
+          style={{
+            width: "100%",
+            padding: 10,
+            background: "#1976d2",
+            color: "white",
+            border: "none",
+            borderRadius: 5,
+            cursor: loading ? "not-allowed" : "pointer"
+          }}
+        >
+          {loading ? "Signing up..." : "Signup"}
+        </button>
+      </form>
+      <div style={{ textAlign: "center", marginTop: 16 }}>
+        Already have an account? <a href="/login">Login</a>
+      </div>
     </div>
   );
 };

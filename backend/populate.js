@@ -7,12 +7,13 @@ const seedDB = async () => {
       DROP TABLE IF EXISTS Ride_Riders, Payment, Accident, Ride_Request, Rating, Ride, Vehicle, Driver, Rider, Motorcycle, Car, Microbus, Admin, Person CASCADE;
 
       -- Person table (auto ID)
-      CREATE TABLE IF NOT EXISTS Person (
+      CREATE TABLE Person (
         PID BIGSERIAL PRIMARY KEY,
         Email VARCHAR(255) UNIQUE NOT NULL,
-        Name VARCHAR(255),
-        Phone_Number VARCHAR(50)
+        Name VARCHAR(255) NOT NULL,
+        Phone_Number VARCHAR(20) UNIQUE NOT NULL
       );
+
 
       -- Rider table
       CREATE TABLE IF NOT EXISTS Rider (
