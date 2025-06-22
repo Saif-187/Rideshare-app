@@ -24,21 +24,27 @@ app.post('/login', async (req, res) => {
   const { role, id, password } = req.body;
 
   try {
-    let result;
+    let result, rid;
     if (role === 'Rider') {
       result = await pool.query(
         'SELECT * FROM Rider WHERE RID = $1 AND Password = $2',
         [id, password]
       );
+      if (result.rows.length > 0) {
+        rid = result.rows[0].rid;
+      }
     } else if (role === 'Driver') {
       result = await pool.query(
-        'SELECT * FROM Driver WHERE Driver_ID = $1 AND License = $2', // License as pseudo-password
+        'SELECT * FROM Driver WHERE Driver_ID = $1 AND License = $2',
         [id, password]
       );
+      if (result.rows.length > 0) {
+        rid = result.rows[0].driver_id;
+      }
     }
 
-    if (result.rows.length > 0) {
-      res.json({ message: `Welcome, ${role}!` });
+    if (result && result.rows.length > 0) {
+      res.json({ message: `Welcome, ${role}!`, rid });
     } else {
       res.status(401).json({ message: 'Invalid credentials' });
     }
@@ -48,6 +54,7 @@ app.post('/login', async (req, res) => {
   }
 });
 
+// Signup route
 app.post('/signup', async (req, res) => {
   const {
     name, email, phone, password,
@@ -94,7 +101,60 @@ app.post('/signup', async (req, res) => {
   }
 });
 
-// Start server
+// ==== UNIVERSAL PROFILE ROUTE ====
+// Returns all info for a user (Rider, Driver, or both) including all vehicles!
+app.get('/profile', async (req, res) => {
+  const { rid } = req.query;
+  if (!rid) return res.status(400).json({ message: "RID required" });
+
+  try {
+    // Get person info
+    const personResult = await pool.query(
+      `SELECT Name, Email, Phone_Number, PID FROM Person WHERE PID = $1`,
+      [rid]
+    );
+    if (personResult.rows.length === 0)
+      return res.status(404).json({ message: "User not found" });
+    let profile = { ...personResult.rows[0] };
+
+    // Is Rider?
+    const riderResult = await pool.query(
+      `SELECT RID, Created_at, Password FROM Rider WHERE RID = $1`,
+      [rid]
+    );
+    if (riderResult.rows.length > 0) {
+      profile.role = "Rider";
+      profile.created_at = riderResult.rows[0].created_at;
+    }
+
+    // Is Driver?
+    const driverResult = await pool.query(
+      `SELECT License, Rating, Is_active FROM Driver WHERE Driver_ID = $1`,
+      [rid]
+    );
+    if (driverResult.rows.length > 0) {
+      profile.role = "Driver"; // Overwrites if both, but you can customize!
+      profile.license = driverResult.rows[0].license;
+      profile.rating = driverResult.rows[0].rating;
+      profile.is_active = driverResult.rows[0].is_active;
+
+      // Get ALL vehicles for this driver!
+      const vehicleResult = await pool.query(
+        `SELECT Vehicle_ID, License_Plate, Manufacturer, Model, Year, Color, Seats
+         FROM Vehicle WHERE Driver_ID = $1`,
+        [rid]
+      );
+      profile.vehicles = vehicleResult.rows; // An array of vehicles
+    }
+
+    res.json(profile);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Error fetching profile" });
+  }
+});
+// ===========================
+
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
 });

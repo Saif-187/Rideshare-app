@@ -2,10 +2,10 @@ import React, { useState } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 
-const emojiMap = {
-  Rider: "🧑‍🦱",   // Or you can use "👤" if you prefer a simpler look
-  Driver: "🚕"
-};
+const roles = [
+  { label: "Rider", color: "#1976d2", bg: "#e3f2fd" },
+  { label: "Driver", color: "#a52745", bg: "#ffe0e3" },
+];
 
 const Login = () => {
   const [role, setRole] = useState('Rider');
@@ -30,7 +30,14 @@ const Login = () => {
 
       setMessage(res.data.message);
 
-      // Redirect to appropriate home page on successful login
+      // ⭐ Save RID to localStorage after successful login ⭐
+      if (res.data.rid) {
+        localStorage.setItem('rid', res.data.rid);
+        console.log("RID saved to localStorage:", res.data.rid);
+      } else {
+        console.warn("No RID found in backend response!", res.data);
+      }
+
       if (res.status === 200) {
         setTimeout(() => {
           if (role === 'Rider') {
@@ -45,6 +52,7 @@ const Login = () => {
         error.response?.data?.message ||
         'Login failed'
       );
+      console.error("Login failed:", error.response?.data || error);
     } finally {
       setLoading(false);
     }
@@ -53,61 +61,109 @@ const Login = () => {
   return (
     <div style={{
       minHeight: "100vh",
-      background: "linear-gradient(135deg, #f7fffc 0%, #a7bfe8 100%)",
+      width: "100vw",
       display: "flex",
-      alignItems: "center",
-      justifyContent: "center"
+      overflow: "hidden",
+      fontFamily: "inherit"
     }}>
+      {/* Rider Panel */}
+      <div
+        onClick={() => setRole("Rider")}
+        style={{
+          width: "50%",
+          background: roles[0].bg,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          transition: "background 0.3s",
+          cursor: "pointer",
+          flexDirection: "column",
+          zIndex: role === "Rider" ? 2 : 1
+        }}
+      >
+        <div style={{
+          fontSize: 38,
+          fontWeight: 800,
+          letterSpacing: 2,
+          color: role === "Rider" ? roles[0].color : "#777",
+          transition: "color 0.2s"
+        }}>
+          Rider Login
+        </div>
+        <div style={{
+          marginTop: 18,
+          fontSize: 20,
+          color: "#444",
+          opacity: role === "Rider" ? 1 : 0.6,
+          fontWeight: 500
+        }}>
+          {role === "Rider" ? "Click again to continue" : "Click to login as Rider"}
+        </div>
+      </div>
+
+      {/* Driver Panel */}
+      <div
+        onClick={() => setRole("Driver")}
+        style={{
+          width: "50%",
+          background: roles[1].bg,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          transition: "background 0.3s",
+          cursor: "pointer",
+          flexDirection: "column",
+          zIndex: role === "Driver" ? 2 : 1
+        }}
+      >
+        <div style={{
+          fontSize: 38,
+          fontWeight: 800,
+          letterSpacing: 2,
+          color: role === "Driver" ? roles[1].color : "#777",
+          transition: "color 0.2s"
+        }}>
+          Driver Login
+        </div>
+        <div style={{
+          marginTop: 18,
+          fontSize: 20,
+          color: "#444",
+          opacity: role === "Driver" ? 1 : 0.6,
+          fontWeight: 500
+        }}>
+          {role === "Driver" ? "Click again to continue" : "Click to login as Driver"}
+        </div>
+      </div>
+
+      {/* Sliding Login Form */}
       <div style={{
+        position: "fixed",
+        top: 0,
+        left: role === "Rider" ? 0 : "50vw",
+        width: "50vw",
+        height: "100vh",
         background: "#fff",
-        padding: "40px 32px",
-        borderRadius: 16,
-        boxShadow: "0 8px 32px 0 rgba(31, 38, 135, 0.12)",
-        minWidth: 350,
-        maxWidth: "94vw",
-        textAlign: "center"
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        boxShadow: "0 8px 40px 0 rgba(31, 38, 135, 0.09)",
+        borderRadius: "0px",
+        zIndex: 10,
+        transition: "left 0.5s cubic-bezier(.55,.06,.68,.19)"
       }}>
         <div style={{
-          marginBottom: 18,
+          marginBottom: 12,
           fontWeight: 700,
-          color: "#1976d2",
-          fontSize: 38,
+          color: role === "Rider" ? roles[0].color : roles[1].color,
+          fontSize: 32,
           letterSpacing: 1
         }}>
-          {emojiMap[role]} {/* Dynamic emoji */}
+          {role} Login
         </div>
-        <div style={{
-          marginBottom: 14,
-          fontWeight: 700,
-          color: "#1976d2",
-          fontSize: 28,
-          letterSpacing: 1
-        }}>
-          Login as {role}
-        </div>
-        <div style={{ marginBottom: 22, color: "#666", fontSize: 15 }}>
+        <div style={{ marginBottom: 20, color: "#666", fontSize: 17 }}>
           Welcome back! Please login to your account.
-        </div>
-        <div style={{ marginBottom: 20, textAlign: "left" }}>
-          <label style={{ fontWeight: 500, color: "#1976d2" }}>
-            Role:
-            <select
-              value={role}
-              onChange={(e) => setRole(e.target.value)}
-              style={{
-                marginLeft: 10,
-                padding: "6px 14px",
-                border: "1px solid #bfc9d6",
-                borderRadius: 5,
-                fontSize: 15,
-                color: "#1976d2",
-                background: "#f7fafd"
-              }}
-            >
-              <option value="Rider">Rider</option>
-              <option value="Driver">Driver</option>
-            </select>
-          </label>
         </div>
         <input
           type="text"
@@ -115,12 +171,12 @@ const Login = () => {
           value={id}
           onChange={(e) => setId(e.target.value)}
           style={{
-            width: "100%",
-            marginBottom: 16,
-            padding: 12,
+            width: "74%",
+            marginBottom: 18,
+            padding: 14,
             border: "1.5px solid #dde3f0",
-            borderRadius: 7,
-            fontSize: 17
+            borderRadius: 8,
+            fontSize: 19
           }}
         />
         <input
@@ -129,28 +185,30 @@ const Login = () => {
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           style={{
-            width: "100%",
-            marginBottom: 20,
-            padding: 12,
+            width: "74%",
+            marginBottom: 22,
+            padding: 14,
             border: "1.5px solid #dde3f0",
-            borderRadius: 7,
-            fontSize: 17
+            borderRadius: 8,
+            fontSize: 19
           }}
         />
         <button
           onClick={handleLogin}
           disabled={loading}
           style={{
-            width: "100%",
+            width: "74%",
             padding: "13px 0",
-            background: loading ? "#8ab4f8" : "#1976d2",
+            background: loading
+              ? (role === "Rider" ? "#64a9ee" : "#de7693")
+              : (role === "Rider" ? "#1976d2" : "#a52745"),
             color: "white",
             border: "none",
             borderRadius: 8,
-            fontSize: 19,
-            fontWeight: 600,
+            fontSize: 21,
+            fontWeight: 700,
             letterSpacing: 1,
-            marginBottom: 18,
+            marginBottom: 14,
             boxShadow: "0 3px 12px #dde3f0",
             cursor: loading ? "not-allowed" : "pointer",
             transition: "background 0.2s"
@@ -163,7 +221,8 @@ const Login = () => {
             color: '#219653',
             marginTop: 6,
             marginBottom: 6,
-            fontWeight: 500
+            fontWeight: 500,
+            fontSize: 17
           }}>{message}</div>
         )}
         {errorMsg && (
@@ -171,16 +230,17 @@ const Login = () => {
             color: '#e23b41',
             marginTop: 6,
             marginBottom: 6,
-            fontWeight: 500
+            fontWeight: 500,
+            fontSize: 17
           }}>{errorMsg}</div>
         )}
         <div style={{
           textAlign: "center",
-          marginTop: 18,
-          fontSize: 15
+          marginTop: 16,
+          fontSize: 16
         }}>
           New here?{" "}
-          <a href="/signup" style={{ color: "#1976d2", fontWeight: 600 }}>
+          <a href="/signup" style={{ color: role === "Rider" ? "#1976d2" : "#a52745", fontWeight: 700 }}>
             Signup
           </a>
         </div>
