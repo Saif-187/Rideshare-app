@@ -1,14 +1,33 @@
 import express from 'express';
 import cors from 'cors';
 import pool from './db.js';
+import jwt from 'jsonwebtoken';
+import dotenv from 'dotenv';
+dotenv.config();
 
 const app = express();
 const PORT = 3002;
+const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_key';
 
 app.use(cors());
 app.use(express.json());
 
-// Test route
+/**
+ * JWT verification middleware.
+ * Call as `authenticateJWT` before any protected route.
+ */
+function authenticateJWT(req, res, next) {
+  const authHeader = req.headers.authorization;
+  if (!authHeader) return res.status(401).json({ message: "No token provided" });
+  const token = authHeader.split(' ')[1];
+  jwt.verify(token, JWT_SECRET, (err, user) => {
+    if (err) return res.status(403).json({ message: "Invalid or expired token" });
+    req.user = user;
+    next();
+  });
+}
+
+// --- Test route ---
 app.get('/test', async (req, res) => {
   try {
     const result = await pool.query('SELECT NOW()');
@@ -19,12 +38,11 @@ app.get('/test', async (req, res) => {
   }
 });
 
-// Login route
+// --- JWT Login Route ---
 app.post('/login', async (req, res) => {
   const { role, id, password } = req.body;
-
   try {
-    let result, rid;
+    let result, rid, userData;
     if (role === 'Rider') {
       result = await pool.query(
         'SELECT * FROM Rider WHERE RID = $1 AND Password = $2',
@@ -32,6 +50,7 @@ app.post('/login', async (req, res) => {
       );
       if (result.rows.length > 0) {
         rid = result.rows[0].rid;
+        userData = { rid, role: 'Rider' };
       }
     } else if (role === 'Driver') {
       result = await pool.query(
@@ -40,11 +59,14 @@ app.post('/login', async (req, res) => {
       );
       if (result.rows.length > 0) {
         rid = result.rows[0].driver_id;
+        userData = { rid, role: 'Driver' };
       }
     }
 
     if (result && result.rows.length > 0) {
-      res.json({ message: `Welcome, ${role}!`, rid });
+      // Issue JWT
+      const token = jwt.sign(userData, JWT_SECRET, { expiresIn: '2h' });
+      res.json({ message: `Welcome, ${role}!`, token });
     } else {
       res.status(401).json({ message: 'Invalid credentials' });
     }
@@ -54,7 +76,7 @@ app.post('/login', async (req, res) => {
   }
 });
 
-// Signup route
+// --- Signup route (no JWT needed) ---
 app.post('/signup', async (req, res) => {
   const {
     name, email, phone, password,
@@ -101,10 +123,9 @@ app.post('/signup', async (req, res) => {
   }
 });
 
-// ==== UNIVERSAL PROFILE ROUTE ====
-// Returns all info for a user (Rider, Driver, or both) including all vehicles!
-app.get('/profile', async (req, res) => {
-  const { rid } = req.query;
+// --- PROTECTED PROFILE ROUTE: expects JWT, no query param ---
+app.get('/profile', authenticateJWT, async (req, res) => {
+  const { rid } = req.user;
   if (!rid) return res.status(400).json({ message: "RID required" });
 
   try {
@@ -133,7 +154,7 @@ app.get('/profile', async (req, res) => {
       [rid]
     );
     if (driverResult.rows.length > 0) {
-      profile.role = "Driver"; // Overwrites if both, but you can customize!
+      profile.role = "Driver";
       profile.license = driverResult.rows[0].license;
       profile.rating = driverResult.rows[0].rating;
       profile.is_active = driverResult.rows[0].is_active;
@@ -144,7 +165,7 @@ app.get('/profile', async (req, res) => {
          FROM Vehicle WHERE Driver_ID = $1`,
         [rid]
       );
-      profile.vehicles = vehicleResult.rows; // An array of vehicles
+      profile.vehicles = vehicleResult.rows;
     }
 
     res.json(profile);
@@ -153,7 +174,6 @@ app.get('/profile', async (req, res) => {
     res.status(500).json({ message: "Error fetching profile" });
   }
 });
-// ===========================
 
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);

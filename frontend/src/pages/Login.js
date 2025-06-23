@@ -1,3 +1,5 @@
+// src/pages/Login.js
+
 import React, { useState } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
@@ -28,17 +30,17 @@ const Login = () => {
         password,
       });
 
-      setMessage(res.data.message);
+      // JWT Token!
+      if (res.data.token) {
+        localStorage.setItem('token', res.data.token);
 
-      // ⭐ Save RID to localStorage after successful login ⭐
-      if (res.data.rid) {
-        localStorage.setItem('rid', res.data.rid);
-        console.log("RID saved to localStorage:", res.data.rid);
-      } else {
-        console.warn("No RID found in backend response!", res.data);
-      }
+        // Optionally decode JWT to get rid/role (or rely on backend for `/profile`)
+        const payload = JSON.parse(atob(res.data.token.split('.')[1]));
+        localStorage.setItem('rid', payload.rid);
+        localStorage.setItem('role', payload.role);
 
-      if (res.status === 200) {
+        setMessage(res.data.message);
+
         setTimeout(() => {
           if (role === 'Rider') {
             navigate('/rider/home');
@@ -46,13 +48,14 @@ const Login = () => {
             navigate('/driver/home');
           }
         }, 700);
+      } else {
+        setErrorMsg('No token received!');
       }
     } catch (error) {
       setErrorMsg(
         error.response?.data?.message ||
         'Login failed'
       );
-      console.error("Login failed:", error.response?.data || error);
     } finally {
       setLoading(false);
     }

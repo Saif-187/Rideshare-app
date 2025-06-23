@@ -1,16 +1,8 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+// src/pages/Signup.js
 
-// Style object for reuse
-const inputStyle = {
-  width: "100%",
-  padding: 14,
-  fontSize: 17,
-  borderRadius: 8,
-  border: "1.5px solid #dde3f0",
-  boxSizing: "border-box"
-};
+import React, { useState } from 'react';
+import axios from 'axios';
+import { useNavigate } from 'react-router-dom';
 
 const roles = [
   { label: "Rider", color: "#1976d2", bg: "#e3f2fd" },
@@ -85,6 +77,7 @@ const Signup = () => {
       const payload = { ...form, wantsToBeDriver: role === "Driver" };
       const res = await axios.post('http://localhost:3002/signup', payload);
       alert(res.data.message);
+      // After successful signup, send user to login page for JWT login.
       navigate('/login');
     } catch (err) {
       setErrorMsg(
@@ -227,7 +220,13 @@ const Signup = () => {
               value={form.name}
               onChange={handleChange}
               required
-              style={inputStyle}
+              style={{
+                width: "100%",
+                padding: 14,
+                fontSize: 17,
+                borderRadius: 8,
+                border: "1.5px solid #dde3f0"
+              }}
             />
             <input
               name="email"
@@ -236,7 +235,13 @@ const Signup = () => {
               value={form.email}
               onChange={handleChange}
               required
-              style={inputStyle}
+              style={{
+                width: "100%",
+                padding: 14,
+                fontSize: 17,
+                borderRadius: 8,
+                border: "1.5px solid #dde3f0"
+              }}
             />
             <input
               name="phone"
@@ -244,7 +249,13 @@ const Signup = () => {
               value={form.phone}
               onChange={handleChange}
               required
-              style={inputStyle}
+              style={{
+                width: "100%",
+                padding: 14,
+                fontSize: 17,
+                borderRadius: 8,
+                border: "1.5px solid #dde3f0"
+              }}
             />
             <input
               name="password"
@@ -253,7 +264,13 @@ const Signup = () => {
               value={form.password}
               onChange={handleChange}
               required
-              style={inputStyle}
+              style={{
+                width: "100%",
+                padding: 14,
+                fontSize: 17,
+                borderRadius: 8,
+                border: "1.5px solid #dde3f0"
+              }}
             />
 
             {/* Driver Extra Fields */}
@@ -265,7 +282,13 @@ const Signup = () => {
                   value={form.license}
                   onChange={handleChange}
                   required
-                  style={inputStyle}
+                  style={{
+                    width: "100%",
+                    padding: 14,
+                    fontSize: 17,
+                    borderRadius: 8,
+                    border: "1.5px solid #dde3f0"
+                  }}
                 />
                 <input
                   name="vehicle.plate"
@@ -273,7 +296,13 @@ const Signup = () => {
                   value={form.vehicle.plate}
                   onChange={handleChange}
                   required
-                  style={inputStyle}
+                  style={{
+                    width: "100%",
+                    padding: 14,
+                    fontSize: 17,
+                    borderRadius: 8,
+                    border: "1.5px solid #dde3f0"
+                  }}
                 />
                 <input
                   name="vehicle.make"
@@ -281,7 +310,13 @@ const Signup = () => {
                   value={form.vehicle.make}
                   onChange={handleChange}
                   required
-                  style={inputStyle}
+                  style={{
+                    width: "100%",
+                    padding: 14,
+                    fontSize: 17,
+                    borderRadius: 8,
+                    border: "1.5px solid #dde3f0"
+                  }}
                 />
                 <input
                   name="vehicle.model"
@@ -289,7 +324,13 @@ const Signup = () => {
                   value={form.vehicle.model}
                   onChange={handleChange}
                   required
-                  style={inputStyle}
+                  style={{
+                    width: "100%",
+                    padding: 14,
+                    fontSize: 17,
+                    borderRadius: 8,
+                    border: "1.5px solid #dde3f0"
+                  }}
                 />
                 <input
                   name="vehicle.year"
@@ -297,7 +338,13 @@ const Signup = () => {
                   value={form.vehicle.year}
                   onChange={handleChange}
                   required
-                  style={inputStyle}
+                  style={{
+                    width: "100%",
+                    padding: 14,
+                    fontSize: 17,
+                    borderRadius: 8,
+                    border: "1.5px solid #dde3f0"
+                  }}
                 />
                 <input
                   name="vehicle.color"
@@ -305,7 +352,13 @@ const Signup = () => {
                   value={form.vehicle.color}
                   onChange={handleChange}
                   required
-                  style={inputStyle}
+                  style={{
+                    width: "100%",
+                    padding: 14,
+                    fontSize: 17,
+                    borderRadius: 8,
+                    border: "1.5px solid #dde3f0"
+                  }}
                 />
                 <input
                   name="vehicle.seats"
@@ -313,7 +366,13 @@ const Signup = () => {
                   value={form.vehicle.seats}
                   onChange={handleChange}
                   required
-                  style={inputStyle}
+                  style={{
+                    width: "100%",
+                    padding: 14,
+                    fontSize: 17,
+                    borderRadius: 8,
+                    border: "1.5px solid #dde3f0"
+                  }}
                 />
               </>
             )}

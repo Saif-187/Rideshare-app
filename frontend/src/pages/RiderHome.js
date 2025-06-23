@@ -1,36 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
-import axios from 'axios';
-
-const profileModalStyle = {
-  position: "fixed",
-  top: 0, left: 0,
-  width: "100vw",
-  height: "100vh",
-  background: "rgba(0,0,0,0.25)",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  zIndex: 9999
-};
-
-const profileCardStyle = {
-  background: "#fff",
-  padding: "32px 28px",
-  borderRadius: 16,
-  minWidth: 320,
-  boxShadow: "0 8px 32px rgba(31, 38, 135, 0.14)",
-  maxWidth: "92vw"
-};
+import { useNavigate } from 'react-router-dom';
 
 const RiderHome = () => {
   const [location, setLocation] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [profileOpen, setProfileOpen] = useState(false);
-  const [profile, setProfile] = useState(null);
-  const [profileLoading, setProfileLoading] = useState(false);
-  const [profileError, setProfileError] = useState('');
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef();
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (!navigator.geolocation) {
@@ -53,185 +31,171 @@ const RiderHome = () => {
     );
   }, []);
 
-  // Debug: profileOpen changes
+  // Close menu when clicking outside
   useEffect(() => {
-    console.log("profileOpen state changed:", profileOpen);
-  }, [profileOpen]);
-
-  // Debug: profile changes
-  useEffect(() => {
-    if (profile) {
-      console.log("Profile state updated:", profile);
-    }
-  }, [profile]);
-
-  const handleProfileOpen = async () => {
-    console.log("Profile button clicked!");
-    setProfileOpen(true);
-    setProfileLoading(true);
-    setProfileError('');
-    try {
-      // Always get rid from localStorage
-      const rid = localStorage.getItem('rid');
-      if (!rid) {
-        setProfileError("No RID found in localStorage. Please login again.");
-        setProfileLoading(false);
-        return;
+    const handleClick = (e) => {
+      if (menuOpen && menuRef.current && !menuRef.current.contains(e.target)) {
+        setMenuOpen(false);
       }
-      const res = await axios.get(`http://localhost:3002/profile?rid=${rid}`);
-      console.log("Profile fetch success:", res.data);
-      setProfile(res.data);
-    } catch (e) {
-      console.log("Profile fetch error:", e);
-      setProfileError("Failed to load profile.");
-    } finally {
-      setProfileLoading(false);
-    }
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [menuOpen]);
+
+  // Logout logic
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('rid');
+    setMenuOpen(false);
+    navigate('/');
+  };
+
+  // Menu click actions
+  const handleMenuClick = (action) => {
+    setMenuOpen(false);
+    if (action === 'profile') navigate('/profile');
+    if (action === 'settings') navigate('/settings');
+    if (action === 'logout') handleLogout();
   };
 
   return (
-    <div style={{
-      maxWidth: 500,
-      margin: '40px auto',
-      padding: 24,
-      border: '1px solid #eee',
-      borderRadius: 10,
-      boxShadow: '0 2px 8px #eee',
-      position: "relative"
-    }}>
-      {/* Floating Facebook-style Profile Button */}
-      <button
-        onClick={handleProfileOpen}
-        style={{
-          position: "fixed",
-          top: 30, right: 30,
-          width: 58, height: 58,
-          background: "#1976d2",
+    <div>
+      {/* Top Taskbar */}
+      <div style={{
+        width: "100vw",
+        height: 52,
+        background: "#1976d2",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        padding: "0 26px",
+        boxSizing: "border-box",
+        boxShadow: "0 2px 10px #b0b6be44",
+        position: "fixed",
+        top: 0,
+        left: 0,
+        zIndex: 102,
+      }}>
+        <div style={{
           color: "#fff",
-          border: "none",
-          borderRadius: "50%",
-          fontSize: 27,
-          fontWeight: "bold",
-          boxShadow: "0 4px 16px #dde3f0",
-          cursor: "pointer",
-          zIndex: 101,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center"
-        }}
-        title="User Profile"
-      >
-        <svg
-          width="36"
-          height="36"
-          viewBox="0 0 48 48"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-          aria-hidden="true"
-        >
-          <circle cx="24" cy="24" r="24" fill="#fff" opacity="0.18"/>
-          <circle cx="24" cy="18" r="8" fill="#b0b6be"/>
-          <ellipse cx="24" cy="34" rx="12" ry="8" fill="#b0b6be"/>
-        </svg>
-      </button>
-
-      <h2 style={{ textAlign: 'center' }}>Welcome, Rider!</h2>
-
-      {loading && (
-        <div style={{ textAlign: 'center', marginTop: 32 }}>
-          Finding your current location...
-        </div>
-      )}
-
-      {error && (
-        <div style={{ color: 'red', marginTop: 16, textAlign: 'center' }}>
-          {error}
-        </div>
-      )}
-
-      {location && (
-        <div>
-          <div style={{ margin: "12px 0", textAlign: "center" }}>
-            <b>Your Current Location:</b>
-            <div>Latitude: {location.lat}</div>
-            <div>Longitude: {location.lng}</div>
-          </div>
-          <MapContainer
-            center={[location.lat, location.lng]}
-            zoom={15}
-            style={{ height: "350px", width: "100%", borderRadius: 12 }}
-          >
-            <TileLayer
-              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-              attribution="&copy; OpenStreetMap contributors"
-            />
-            <Marker position={[location.lat, location.lng]}>
-              <Popup>
-                You are here!
-              </Popup>
-            </Marker>
-          </MapContainer>
-        </div>
-      )}
-
-      {/* Profile Modal */}
-      {profileOpen && (
-        <div style={profileModalStyle} onClick={() => {
-          setProfileOpen(false);
-          console.log("Modal closed");
+          fontWeight: 700,
+          fontSize: 21,
+          letterSpacing: 1,
         }}>
-          <div style={profileCardStyle} onClick={e => e.stopPropagation()}>
-            <h3 style={{ textAlign: "center", marginBottom: 16, color: "#1976d2" }}>Your Profile</h3>
-            <div style={{ color: "#1976d2" }}>[DEBUG] Modal is visible!</div>
-            {profileLoading && <div>Loading...</div>}
-            {profileError && <div style={{ color: "red" }}>{profileError}</div>}
-            {profile && (
-              <div style={{ fontSize: 17, lineHeight: "1.7" }}>
-                <div><b>Name:</b> {profile.name}</div>
-                <div><b>Email:</b> {profile.email}</div>
-                <div><b>Phone:</b> {profile.phone_number}</div>
-                <div>
-                  <b>Account Created:</b>{" "}
-                  {profile.created_at && (new Date(profile.created_at)).toLocaleDateString()}
-                </div>
-                <div><b>Role:</b> {profile.role}</div>
-                {profile.role === "Driver" && (
-                  <div style={{ marginTop: 12, background: "#f3e1ea", padding: 10, borderRadius: 8 }}>
-                    <div><b>License:</b> {profile.license}</div>
-                    <div><b>Vehicle Plate:</b> {profile.vehicle?.plate}</div>
-                    <div><b>Vehicle:</b> {profile.vehicle?.make} {profile.vehicle?.model} {profile.vehicle?.year}</div>
-                    <div><b>Color:</b> {profile.vehicle?.color}</div>
-                    <div><b>Seats:</b> {profile.vehicle?.seats}</div>
-                  </div>
-                )}
-              </div>
-            )}
-            <button
-              style={{
-                marginTop: 24,
-                padding: "10px 24px",
-                background: "#1976d2",
-                color: "#fff",
-                border: "none",
-                borderRadius: 7,
-                fontWeight: 600,
-                fontSize: 17,
-                letterSpacing: 1,
-                cursor: "pointer",
-                width: "100%"
-              }}
-              onClick={() => {
-                setProfileOpen(false);
-                console.log("Modal closed");
-              }}
-            >
-              Close
-            </button>
-          </div>
+          Rider Home
         </div>
-      )}
+        <div style={{ position: "relative" }}>
+          <button
+            onClick={() => setMenuOpen((v) => !v)}
+            style={{
+              width: 34,
+              height: 34,
+              background: "#1565c0",
+              color: "#fff",
+              border: "none",
+              borderRadius: "50%",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              cursor: "pointer",
+              boxShadow: "0 2px 8px #dde3f0",
+              padding: 0,
+            }}
+            title="User Menu"
+          >
+            <svg width="20" height="20" viewBox="0 0 48 48" fill="none">
+              <circle cx="24" cy="24" r="24" fill="#1976d2" />
+              <circle cx="24" cy="18" r="8" fill="#fff" />
+              <ellipse cx="24" cy="34" rx="12" ry="8" fill="#fff" />
+            </svg>
+          </button>
+          {/* Dropdown menu */}
+          {menuOpen && (
+            <div ref={menuRef} style={{
+              position: "absolute",
+              right: 0,
+              marginTop: 12,
+              background: "#fff",
+              borderRadius: 10,
+              boxShadow: "0 4px 16px #dde3f0",
+              minWidth: 140,
+              zIndex: 200,
+              overflow: "hidden",
+            }}>
+              <div
+                style={menuItemStyle}
+                onClick={() => handleMenuClick('profile')}
+              >Profile</div>
+              <div
+                style={menuItemStyle}
+                onClick={() => handleMenuClick('settings')}
+              >Settings</div>
+              <div
+                style={{ ...menuItemStyle, color: "#c62828", fontWeight: 700 }}
+                onClick={() => handleMenuClick('logout')}
+              >Logout</div>
+            </div>
+          )}
+        </div>
+      </div>
+      {/* Main Content */}
+      <div style={{
+        maxWidth: 500,
+        margin: '84px auto 0 auto', // margin-top: 84px to push content below app bar
+        padding: 24,
+        border: '1px solid #eee',
+        borderRadius: 10,
+        boxShadow: '0 2px 8px #eee',
+        position: "relative",
+        background: "#fff"
+      }}>
+        <h2 style={{ textAlign: 'center', marginTop: 0 }}>Welcome, Rider!</h2>
+        {loading && (
+          <div style={{ textAlign: 'center', marginTop: 32 }}>
+            Finding your current location...
+          </div>
+        )}
+        {error && (
+          <div style={{ color: 'red', marginTop: 16, textAlign: 'center' }}>
+            {error}
+          </div>
+        )}
+        {location && (
+          <div>
+            <div style={{ margin: "12px 0", textAlign: "center" }}>
+              <b>Your Current Location:</b>
+              <div>Latitude: {location.lat}</div>
+              <div>Longitude: {location.lng}</div>
+            </div>
+            <MapContainer
+              center={[location.lat, location.lng]}
+              zoom={15}
+              style={{ height: "350px", width: "100%", borderRadius: 12 }}
+            >
+              <TileLayer
+                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                attribution="&copy; OpenStreetMap contributors"
+              />
+              <Marker position={[location.lat, location.lng]}>
+                <Popup>
+                  You are here!
+                </Popup>
+              </Marker>
+            </MapContainer>
+          </div>
+        )}
+      </div>
     </div>
   );
 };
 
+const menuItemStyle = {
+  padding: "12px 24px",
+  cursor: "pointer",
+  borderBottom: "1px solid #f0f0f0",
+  background: "#fff",
+  fontWeight: 500,
+  fontSize: 16,
+  transition: "background 0.15s",
+};
 export default RiderHome;

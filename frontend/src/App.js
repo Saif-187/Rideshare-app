@@ -4,7 +4,9 @@ import Home from './pages/Home';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
 import RiderHome from './pages/RiderHome';
-import DriverHome from './pages/DriverHome'; // Import DriverHome
+import DriverHome from './pages/DriverHome';
+import UserProfile from './pages/UserProfile';
+import AppSettings from './pages/AppSettings'; // <- new
 
 function App() {
   return (
@@ -14,10 +16,11 @@ function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
         <Route path="/rider/home" element={<RiderHome />} />
-        <Route path="/driver/home" element={<DriverHome />} /> {/* Add driver home route */}
+        <Route path="/driver/home" element={<DriverHome />} />
+        <Route path="/profile" element={<UserProfile />} />
+        <Route path="/settings" element={<AppSettings />} /> {/* settings route */}
       </Routes>
     </Router>
   );
 }
-
 export default App;
