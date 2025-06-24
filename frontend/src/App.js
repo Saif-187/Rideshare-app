@@ -6,7 +6,8 @@ import Signup from './pages/Signup';
 import RiderHome from './pages/RiderHome';
 import DriverHome from './pages/DriverHome';
 import UserProfile from './pages/UserProfile';
-import AppSettings from './pages/AppSettings'; // <- new
+import AppSettings from './pages/AppSettings';
+import RequestRidePage from './pages/RequestRidePage'; // <- Add this import
 
 function App() {
   return (
@@ -18,9 +19,11 @@ function App() {
         <Route path="/rider/home" element={<RiderHome />} />
         <Route path="/driver/home" element={<DriverHome />} />
         <Route path="/profile" element={<UserProfile />} />
-        <Route path="/settings" element={<AppSettings />} /> {/* settings route */}
+        <Route path="/settings" element={<AppSettings />} />
+        <Route path="/request-ride" element={<RequestRidePage />} /> {/* Add this route */}
       </Routes>
     </Router>
   );
 }
+
 export default App;

@@ -1,37 +1,12 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 const RiderHome = () => {
-  const [location, setLocation] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef();
   const navigate = useNavigate();
 
-  useEffect(() => {
-    if (!navigator.geolocation) {
-      setError('Geolocation is not supported by your browser');
-      setLoading(false);
-      return;
-    }
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setLocation({
-          lat: pos.coords.latitude,
-          lng: pos.coords.longitude
-        });
-        setLoading(false);
-      },
-      (err) => {
-        setError('Unable to retrieve your location. Please allow location access.');
-        setLoading(false);
-      }
-    );
-  }, []);
-
-  // Close menu when clicking outside
+  // Menu close when clicking outside
   useEffect(() => {
     const handleClick = (e) => {
       if (menuOpen && menuRef.current && !menuRef.current.contains(e.target)) {
@@ -56,6 +31,11 @@ const RiderHome = () => {
     if (action === 'profile') navigate('/profile');
     if (action === 'settings') navigate('/settings');
     if (action === 'logout') handleLogout();
+  };
+
+  // New: Request Ride button click
+  const handleRequestRide = () => {
+    navigate('/request-ride');
   };
 
   return (
@@ -150,40 +130,26 @@ const RiderHome = () => {
         background: "#fff"
       }}>
         <h2 style={{ textAlign: 'center', marginTop: 0 }}>Welcome, Rider!</h2>
-        {loading && (
-          <div style={{ textAlign: 'center', marginTop: 32 }}>
-            Finding your current location...
-          </div>
-        )}
-        {error && (
-          <div style={{ color: 'red', marginTop: 16, textAlign: 'center' }}>
-            {error}
-          </div>
-        )}
-        {location && (
-          <div>
-            <div style={{ margin: "12px 0", textAlign: "center" }}>
-              <b>Your Current Location:</b>
-              <div>Latitude: {location.lat}</div>
-              <div>Longitude: {location.lng}</div>
-            </div>
-            <MapContainer
-              center={[location.lat, location.lng]}
-              zoom={15}
-              style={{ height: "350px", width: "100%", borderRadius: 12 }}
-            >
-              <TileLayer
-                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                attribution="&copy; OpenStreetMap contributors"
-              />
-              <Marker position={[location.lat, location.lng]}>
-                <Popup>
-                  You are here!
-                </Popup>
-              </Marker>
-            </MapContainer>
-          </div>
-        )}
+        <div style={{ textAlign: 'center', marginTop: 30 }}>
+          <button
+            style={{
+              display: "inline-block",
+              background: "#1976d2",
+              color: "#fff",
+              padding: "16px 42px",
+              borderRadius: 10,
+              border: "none",
+              fontSize: 20,
+              fontWeight: 600,
+              cursor: "pointer",
+              boxShadow: "0 2px 8px #dde3f0",
+              marginTop: 30
+            }}
+            onClick={handleRequestRide}
+          >
+            Request a Ride
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -198,4 +164,5 @@ const menuItemStyle = {
   fontSize: 16,
   transition: "background 0.15s",
 };
+
 export default RiderHome;

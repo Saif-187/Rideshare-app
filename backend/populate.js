@@ -14,7 +14,6 @@ const seedDB = async () => {
         Phone_Number VARCHAR(20) UNIQUE NOT NULL
       );
 
-
       -- Rider table
       CREATE TABLE IF NOT EXISTS Rider (
         RID BIGINT PRIMARY KEY REFERENCES Person(PID),
@@ -44,7 +43,7 @@ const seedDB = async () => {
 
       -- Ride-related tables
       CREATE TABLE IF NOT EXISTS Ride (
-        Ride_ID BIGINT PRIMARY KEY,
+        Ride_ID BIGSERIAL PRIMARY KEY,
         Vehicle_ID BIGINT REFERENCES Vehicle(Vehicle_ID),
         Pick_up BIGINT,
         Drop_off BIGINT,
@@ -62,7 +61,7 @@ const seedDB = async () => {
       );
 
       CREATE TABLE IF NOT EXISTS Rating (
-        Rating_ID BIGINT PRIMARY KEY,
+        Rating_ID BIGSERIAL PRIMARY KEY,
         Ride_ID BIGINT REFERENCES Ride(Ride_ID),
         Rating_Value FLOAT,
         Comment VARCHAR(255),
@@ -70,12 +69,12 @@ const seedDB = async () => {
       );
 
       CREATE TABLE IF NOT EXISTS Ride_Request (
-        Request_ID BIGINT PRIMARY KEY,
+        Request_ID BIGSERIAL PRIMARY KEY,
         Ride_ID BIGINT REFERENCES Ride(Ride_ID)
       );
 
       CREATE TABLE IF NOT EXISTS Accident (
-        Accident_ID BIGINT PRIMARY KEY,
+        Accident_ID BIGSERIAL PRIMARY KEY,
         Ride_ID BIGINT REFERENCES Ride(Ride_ID),
         Time TIME,
         Latitude FLOAT,
@@ -84,13 +83,13 @@ const seedDB = async () => {
       );
 
       CREATE TABLE IF NOT EXISTS Ride_Riders (
-        Ride_Riders_ID BIGINT PRIMARY KEY,
+        Ride_Riders_ID BIGSERIAL PRIMARY KEY,
         Rider_ID BIGINT REFERENCES Rider(RID),
         Ride_ID BIGINT REFERENCES Ride(Ride_ID)
       );
 
       CREATE TABLE IF NOT EXISTS Payment (
-        Payment_ID BIGINT PRIMARY KEY,
+        Payment_ID BIGSERIAL PRIMARY KEY,
         Ride_ID BIGINT REFERENCES Ride(Ride_ID),
         Amount FLOAT,
         Method VARCHAR(255),
@@ -99,24 +98,24 @@ const seedDB = async () => {
       );
 
       CREATE TABLE IF NOT EXISTS Motorcycle (
-        Bike_ID BIGINT PRIMARY KEY,
+        Bike_ID BIGSERIAL PRIMARY KEY,
         KickStart BOOLEAN,
         Type VARCHAR(255)
       );
 
       CREATE TABLE IF NOT EXISTS Car (
-        Car_ID BIGINT PRIMARY KEY,
+        Car_ID BIGSERIAL PRIMARY KEY,
         AC BOOLEAN
       );
 
       CREATE TABLE IF NOT EXISTS Microbus (
-        Bus_ID BIGINT PRIMARY KEY,
+        Bus_ID BIGSERIAL PRIMARY KEY,
         Roof_Rack BOOLEAN,
         AC BOOLEAN
       );
 
       CREATE TABLE IF NOT EXISTS Admin (
-        Admin_ID BIGINT PRIMARY KEY,
+        Admin_ID BIGSERIAL PRIMARY KEY,
         UID BIGINT,
         Email VARCHAR(255),
         Password VARCHAR(255)
