@@ -7,12 +7,17 @@ import RiderHome from './pages/RiderHome';
 import DriverHome from './pages/DriverHome';
 import UserProfile from './pages/UserProfile';
 import AppSettings from './pages/AppSettings';
-import RequestRidePage from './pages/RequestRidePage'; // <- Add this import
+import RequestRidePage from './pages/RequestRidePage';
+import AvailableRidesPage from "./pages/AvailableRidesPage";
+import DriverSimulationPage from './pages/DriverSimulationPage';
+import RiderSimulationPage from './pages/RiderSimulationPage';
 
 function App() {
   return (
     <Router>
       <Routes>
+        <Route path="/ride/:rideId/driver-sim" element={<DriverSimulationPage />} />  
+        <Route path="/ride/:rideId/rider-sim" element={<RiderSimulationPage />} />
         <Route path="/" element={<Home />} />
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
@@ -20,7 +25,8 @@ function App() {
         <Route path="/driver/home" element={<DriverHome />} />
         <Route path="/profile" element={<UserProfile />} />
         <Route path="/settings" element={<AppSettings />} />
-        <Route path="/request-ride" element={<RequestRidePage />} /> {/* Add this route */}
+        <Route path="/request-ride" element={<RequestRidePage />} />
+        <Route path="/driver/available-rides" element={<AvailableRidesPage />} />
       </Routes>
     </Router>
   );

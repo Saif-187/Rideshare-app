@@ -77,7 +77,6 @@ const Signup = () => {
       const payload = { ...form, wantsToBeDriver: role === "Driver" };
       const res = await axios.post('http://localhost:3002/signup', payload);
       alert(res.data.message);
-      // After successful signup, send user to login page for JWT login.
       navigate('/login');
     } catch (err) {
       setErrorMsg(
@@ -98,7 +97,6 @@ const Signup = () => {
       overflow: "hidden",
       fontFamily: "inherit"
     }}>
-      {/* Rider Panel */}
       <div
         onClick={() => handleRoleChange("Rider")}
         style={{
@@ -133,7 +131,6 @@ const Signup = () => {
         </div>
       </div>
 
-      {/* Driver Panel */}
       <div
         onClick={() => handleRoleChange("Driver")}
         style={{
@@ -168,7 +165,7 @@ const Signup = () => {
         </div>
       </div>
 
-      {/* Sliding Signup Form */}
+      
       <div style={{
         position: "fixed",
         top: 0,
@@ -273,7 +270,7 @@ const Signup = () => {
               }}
             />
 
-            {/* Driver Extra Fields */}
+            
             {role === "Driver" && (
               <>
                 <input
@@ -407,7 +404,7 @@ const Signup = () => {
             </button>
           </form>
         </div>
-        {/* Always visible at the bottom of the sliding panel */}
+        
         <div style={{
           textAlign: "center",
           margin: "18px 0 32px 0",

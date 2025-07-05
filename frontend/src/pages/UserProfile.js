@@ -1,4 +1,3 @@
-// src/pages/UserProfile.js
 
 import React, { useEffect, useState } from "react";
 import axios from "axios";
@@ -74,7 +73,6 @@ const UserProfile = () => {
   return (
     <div style={cardStyle}>
       <div style={avatarStyle}>
-        {/* Simple faceless avatar SVG */}
         <svg width="44" height="44" viewBox="0 0 44 44">
           <circle cx="22" cy="22" r="22" fill="#1976d2" />
           <circle cx="22" cy="17" r="8" fill="#fff" />
@@ -120,7 +118,6 @@ const UserProfile = () => {
                           {v.license_plate || "Unknown Plate"}{" "}
                           {expandedVehicle === idx ? "▲" : "▼"}
                         </button>
-                        {/* Vehicle Details */}
                         {expandedVehicle === idx && (
                           <div style={{
                             marginTop: 5,

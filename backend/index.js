@@ -1,9 +1,7 @@
-// index.js
-
 import express from 'express';
 import cors from 'cors';
 import { PORT } from './config.js';
-
+import driverRoutes from './routes/driver.js';
 import rideRoutes from './routes/ride.js';
 import authRoutes from './routes/auth.js';
 import profileRoutes from './routes/profile.js';
@@ -13,12 +11,13 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Mount modular routes
-app.use(authRoutes);     // Handles /login, /signup, etc.
-app.use(profileRoutes);  // Handles /profile and similar
-app.use(rideRoutes);     // Handles /request-ride, /available-rides, etc.
+// API Routes
+app.use(authRoutes);         // /login, /signup
+app.use(profileRoutes);      // /profile
+app.use(rideRoutes);         // /request-ride, /accept-ride, /available-rides, /ride-status/:ride_id
+app.use('/api/driver', driverRoutes); // /api/driver/update-location, etc.
 
-// Optional: Catch-all for undefined routes
+// 404 for everything else
 app.use((req, res) => {
   res.status(404).json({ message: 'Route not found' });
 });

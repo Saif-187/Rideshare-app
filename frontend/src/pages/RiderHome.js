@@ -6,7 +6,7 @@ const RiderHome = () => {
   const menuRef = useRef();
   const navigate = useNavigate();
 
-  // Menu close when clicking outside
+  
   useEffect(() => {
     const handleClick = (e) => {
       if (menuOpen && menuRef.current && !menuRef.current.contains(e.target)) {
@@ -17,7 +17,7 @@ const RiderHome = () => {
     return () => document.removeEventListener("mousedown", handleClick);
   }, [menuOpen]);
 
-  // Logout logic
+ 
   const handleLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('rid');
@@ -25,7 +25,7 @@ const RiderHome = () => {
     navigate('/');
   };
 
-  // Menu click actions
+  
   const handleMenuClick = (action) => {
     setMenuOpen(false);
     if (action === 'profile') navigate('/profile');
@@ -33,14 +33,13 @@ const RiderHome = () => {
     if (action === 'logout') handleLogout();
   };
 
-  // New: Request Ride button click
+  
   const handleRequestRide = () => {
     navigate('/request-ride');
   };
 
   return (
     <div>
-      {/* Top Taskbar */}
       <div style={{
         width: "100vw",
         height: 52,
@@ -89,7 +88,6 @@ const RiderHome = () => {
               <ellipse cx="24" cy="34" rx="12" ry="8" fill="#fff" />
             </svg>
           </button>
-          {/* Dropdown menu */}
           {menuOpen && (
             <div ref={menuRef} style={{
               position: "absolute",
@@ -118,10 +116,9 @@ const RiderHome = () => {
           )}
         </div>
       </div>
-      {/* Main Content */}
       <div style={{
         maxWidth: 500,
-        margin: '84px auto 0 auto', // margin-top: 84px to push content below app bar
+        margin: '84px auto 0 auto', 
         padding: 24,
         border: '1px solid #eee',
         borderRadius: 10,

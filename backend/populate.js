@@ -2,162 +2,86 @@ import pool from './db.js';
 
 const seedDB = async () => {
   try {
+    // ====== CLEAN EXISTING DATA FOR FRESH START ======
     await pool.query(`
-      -- Drop existing tables for clean setup (optional for dev/testing)
-      DROP TABLE IF EXISTS Ride_Riders, Payment, Accident, Ride_Request, Rating, Ride, Vehicle, Driver, Rider, Motorcycle, Car, Microbus, Admin, Person CASCADE;
-
-      -- Person table (auto ID)
-      CREATE TABLE Person (
-        PID BIGSERIAL PRIMARY KEY,
-        Email VARCHAR(255) UNIQUE NOT NULL,
-        Name VARCHAR(255) NOT NULL,
-        Phone_Number VARCHAR(20) UNIQUE NOT NULL
-      );
-
-      -- Rider table
-      CREATE TABLE IF NOT EXISTS Rider (
-        RID BIGINT PRIMARY KEY REFERENCES Person(PID),
-        Created_at DATE DEFAULT CURRENT_DATE,
-        Password VARCHAR(255)
-      );
-
-      -- Driver table
-      CREATE TABLE IF NOT EXISTS Driver (
-        Driver_ID BIGINT PRIMARY KEY REFERENCES Person(PID),
-        Rating FLOAT,
-        Is_active BOOLEAN,
-        License BIGINT
-      );
-
-      -- Vehicle table
-      CREATE TABLE IF NOT EXISTS Vehicle (
-        Vehicle_ID BIGINT PRIMARY KEY,
-        Driver_ID BIGINT REFERENCES Driver(Driver_ID),
-        License_Plate VARCHAR(255),
-        Manufacturer VARCHAR(255),
-        Model VARCHAR(255),
-        Year INT,
-        Color VARCHAR(255),
-        Seats INT
-      );
-
-      -- Ride-related tables
-      CREATE TABLE IF NOT EXISTS Ride (
-        Ride_ID BIGSERIAL PRIMARY KEY,
-        Vehicle_ID BIGINT REFERENCES Vehicle(Vehicle_ID),
-        Pick_up BIGINT,
-        Drop_off BIGINT,
-        History_ID BIGINT,
-        Is_Shared BOOLEAN,
-        Start_Time TIMESTAMP,
-        End_Time TIMESTAMP,
-        Fare FLOAT,
-        Start_Latitude FLOAT,
-        Start_Longitude FLOAT,
-        End_Latitude FLOAT,
-        End_Longitude FLOAT,
-        Start_Location VARCHAR(255),
-        End_Location VARCHAR(255)
-      );
-
-      CREATE TABLE IF NOT EXISTS Rating (
-        Rating_ID BIGSERIAL PRIMARY KEY,
-        Ride_ID BIGINT REFERENCES Ride(Ride_ID),
-        Rating_Value FLOAT,
-        Comment VARCHAR(255),
-        Time TIMESTAMP
-      );
-
-      CREATE TABLE IF NOT EXISTS Ride_Request (
-        Request_ID BIGSERIAL PRIMARY KEY,
-        Ride_ID BIGINT REFERENCES Ride(Ride_ID)
-      );
-
-      CREATE TABLE IF NOT EXISTS Accident (
-        Accident_ID BIGSERIAL PRIMARY KEY,
-        Ride_ID BIGINT REFERENCES Ride(Ride_ID),
-        Time TIME,
-        Latitude FLOAT,
-        Longitude FLOAT,
-        Location VARCHAR(255)
-      );
-
-      CREATE TABLE IF NOT EXISTS Ride_Riders (
-        Ride_Riders_ID BIGSERIAL PRIMARY KEY,
-        Rider_ID BIGINT REFERENCES Rider(RID),
-        Ride_ID BIGINT REFERENCES Ride(Ride_ID)
-      );
-
-      CREATE TABLE IF NOT EXISTS Payment (
-        Payment_ID BIGSERIAL PRIMARY KEY,
-        Ride_ID BIGINT REFERENCES Ride(Ride_ID),
-        Amount FLOAT,
-        Method VARCHAR(255),
-        Status VARCHAR(255),
-        Time TIMESTAMP
-      );
-
-      CREATE TABLE IF NOT EXISTS Motorcycle (
-        Bike_ID BIGSERIAL PRIMARY KEY,
-        KickStart BOOLEAN,
-        Type VARCHAR(255)
-      );
-
-      CREATE TABLE IF NOT EXISTS Car (
-        Car_ID BIGSERIAL PRIMARY KEY,
-        AC BOOLEAN
-      );
-
-      CREATE TABLE IF NOT EXISTS Microbus (
-        Bus_ID BIGSERIAL PRIMARY KEY,
-        Roof_Rack BOOLEAN,
-        AC BOOLEAN
-      );
-
-      CREATE TABLE IF NOT EXISTS Admin (
-        Admin_ID BIGSERIAL PRIMARY KEY,
-        UID BIGINT,
-        Email VARCHAR(255),
-        Password VARCHAR(255)
-      );
+      DELETE FROM Payment;
+      DELETE FROM Ride_Riders;
+      DELETE FROM Ride_Request;
+      DELETE FROM Accident;
+      DELETE FROM Rating;
+      DELETE FROM Ride;
+      DELETE FROM Vehicle;
+      DELETE FROM Driver;
+      DELETE FROM Rider;
+      DELETE FROM Person;
+      DELETE FROM Admin;
     `);
+    await pool.query(`
+      ALTER TABLE Ride ADD COLUMN IF NOT EXISTS Status VARCHAR(32) DEFAULT 'pending';
+    `);
+    // ===== DUMMY DATA SECTION =====
 
-    // Insert dummy users for login testing
-    const alice = await pool.query(
+    // --- Riders ---
+    const rider1 = await pool.query(
       `INSERT INTO Person (Email, Name, Phone_Number)
-       VALUES ('alice@example.com', 'Alice Wonderland', '0123456789')
-       RETURNING PID`
+       VALUES ('rider1@email.com', 'Rider One', '9000000001') RETURNING PID`
     );
-    const bob = await pool.query(
+    const rider2 = await pool.query(
       `INSERT INTO Person (Email, Name, Phone_Number)
-       VALUES ('bob@example.com', 'Bob Builder', '0987654321')
-       RETURNING PID`
+       VALUES ('rider2@email.com', 'Rider Two', '9000000002') RETURNING PID`
     );
-
-    const aliceID = alice.rows[0].pid;
-    const bobID = bob.rows[0].pid;
+    const rider1PID = rider1.rows[0].pid;
+    const rider2PID = rider2.rows[0].pid;
 
     await pool.query(
-      `INSERT INTO Rider (RID, Password) VALUES
-       ($1, 'alicepass'), ($2, 'bobpass')`,
-      [aliceID, bobID]
+      `INSERT INTO Rider (RID, Password) VALUES 
+      ($1, 'rider1pass'), 
+      ($2, 'rider2pass')`,
+      [rider1PID, rider2PID]
     );
+
+    // --- Drivers ---
+    const driver1 = await pool.query(
+      `INSERT INTO Person (Email, Name, Phone_Number)
+       VALUES ('driver1@email.com', 'Driver One', '9110000001') RETURNING PID`
+    );
+    const driver2 = await pool.query(
+      `INSERT INTO Person (Email, Name, Phone_Number)
+       VALUES ('driver2@email.com', 'Driver Two', '9110000002') RETURNING PID`
+    );
+    const driver1PID = driver1.rows[0].pid;
+    const driver2PID = driver2.rows[0].pid;
 
     await pool.query(
-      `INSERT INTO Driver (Driver_ID, Rating, Is_active, License) VALUES
-       ($1, 4.9, TRUE, 123123),
-       ($2, 4.7, TRUE, 456456)`,
-      [aliceID, bobID]
+      `INSERT INTO Driver 
+        (Driver_ID, Rating, Is_active, License, Current_Latitude, Current_Longitude)
+       VALUES
+        ($1, 4.8, true, 1001001, 23.780636, 90.419325),  -- Banani, Dhaka
+        ($2, 4.6, true, 1001002, 23.777176, 90.399452)   -- Dhanmondi, Dhaka
+      `,
+      [driver1PID, driver2PID]
     );
 
+    // --- Vehicles ---
     await pool.query(
-      `INSERT INTO Vehicle (Vehicle_ID, Driver_ID, License_Plate, Manufacturer, Model, Year, Color, Seats) VALUES
-       ($1, $1, 'ALICE123', 'Toyota', 'Corolla', 2020, 'Blue', 4),
-       ($2, $2, 'BOB456', 'Honda', 'Civic', 2019, 'Red', 4)`,
-      [aliceID, bobID]
+      `INSERT INTO Vehicle 
+        (Vehicle_ID, Driver_ID, License_Plate, Manufacturer, Model, Year, Color, Seats)
+       VALUES
+        ($1, $1, 'BAN123', 'Toyota', 'Corolla', 2021, 'Blue', 4),
+        ($2, $2, 'DHA456', 'Honda', 'Civic', 2022, 'Red', 4)
+      `,
+      [driver1PID, driver2PID]
     );
 
-    console.log('✅ All tables created and test users inserted successfully!');
+    // --- Admin (optional, for completeness) ---
+    await pool.query(
+      `INSERT INTO Admin (UID, Email, Password) VALUES
+        (1, 'admin@email.com', 'adminpass')
+      `
+    );
+
+    console.log('✅ Dummy drivers, riders, vehicles, and admin inserted!');
+
   } catch (err) {
     console.error('❌ Error setting up database:', err);
   } finally {

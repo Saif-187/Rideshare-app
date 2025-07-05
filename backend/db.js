@@ -1,4 +1,4 @@
-// db.js
+
 import pkg from 'pg';
 import dotenv from 'dotenv';
 dotenv.config();
@@ -12,7 +12,7 @@ const pool = new Pool({
   password: process.env.PGPASSWORD,
   database: process.env.PGDATABASE,
   ssl: {
-    rejectUnauthorized: false, // required for Railway
+    rejectUnauthorized: false, 
   }
 });
 

@@ -1,8 +1,10 @@
-import React, { useState, useRef } from "react";
-import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
+import React, { useState, useRef, useEffect } from "react";
+import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from "react-leaflet";
+import L from "leaflet";
 import { useNavigate } from "react-router-dom";
 
-// Fetch suggestions from OpenStreetMap Nominatim
+const ORS_API_KEY = "5b3ce3597851110001cf6248159fb5b9de2a4436a27aa58dcf630560";
+
 const fetchSuggestions = async (query) => {
   if (!query) return [];
   const res = await fetch(
@@ -11,6 +13,54 @@ const fetchSuggestions = async (query) => {
   return await res.json();
 };
 
+const fetchRoute = async (start, end) => {
+  const url = "https://api.openrouteservice.org/v2/directions/driving-car/geojson";
+  const body = {
+    coordinates: [
+      [start.lng, start.lat],
+      [end.lng, end.lat]
+    ]
+  };
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Authorization": ORS_API_KEY,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body)
+  });
+  if (!res.ok) throw new Error("Failed to fetch route");
+  const data = await res.json();
+  return {
+    coords: data.features[0].geometry.coordinates.map(([lng, lat]) => [lat, lng]),
+    distance: data.features[0].properties.summary.distance, // meters
+    duration: data.features[0].properties.summary.duration // seconds
+  };
+};
+
+// Custom map icons
+const startIcon = new L.DivIcon({
+  className: "",
+  html: `<svg width="36" height="36" viewBox="0 0 36 36"><circle cx="18" cy="18" r="17" fill="#1976d2" stroke="#fff" stroke-width="3"/><text x="18" y="23" font-size="16" text-anchor="middle" fill="#fff" font-family="Arial" font-weight="bold">&#128663;</text></svg>`,
+  iconSize: [36, 36],
+  iconAnchor: [18, 36],
+  popupAnchor: [0, -36],
+});
+const endIcon = new L.DivIcon({
+  className: "",
+  html: `<svg width="34" height="34" viewBox="0 0 34 34"><rect x="1" y="1" width="32" height="32" rx="8" fill="#d32f2f" stroke="#fff" stroke-width="2"/><text x="17" y="24" font-size="18" text-anchor="middle" fill="#fff" font-family="Arial" font-weight="bold">&#x1F6A9;</text></svg>`,
+  iconSize: [34, 34],
+  iconAnchor: [17, 34],
+  popupAnchor: [0, -34],
+});
+const driverIcon = new L.DivIcon({
+  className: "",
+  html: `<svg width="28" height="28" viewBox="0 0 28 28"><circle cx="14" cy="14" r="12" fill="#2e7d32" stroke="#fff" stroke-width="3"/><text x="14" y="19" font-size="16" text-anchor="middle" fill="#fff" font-family="Arial">&#128663;</text></svg>`,
+  iconSize: [28, 28],
+  iconAnchor: [14, 28],
+  popupAnchor: [0, -28],
+});
+
 const RequestRidePage = () => {
   const [startLocation, setStartLocation] = useState("");
   const [endLocation, setEndLocation] = useState("");
@@ -18,15 +68,53 @@ const RequestRidePage = () => {
   const [endSuggestions, setEndSuggestions] = useState([]);
   const [pickupCoords, setPickupCoords] = useState(null);
   const [endCoords, setEndCoords] = useState(null);
+  const [routeCoords, setRouteCoords] = useState([]);
+  const [distance, setDistance] = useState(null);
+  const [duration, setDuration] = useState(null);
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState({ start: false, end: false });
-
+  const [routeLoading, setRouteLoading] = useState(false);
+  const [nearbyDrivers, setNearbyDrivers] = useState([]);
   const navigate = useNavigate();
   const startInputRef = useRef();
   const endInputRef = useRef();
 
-  // Autocomplete for start
+  // Route calculation
+  useEffect(() => {
+    const getRoute = async () => {
+      setError("");
+      setRouteCoords([]);
+      setDistance(null);
+      setDuration(null);
+      if (pickupCoords && endCoords) {
+        setRouteLoading(true);
+        try {
+          const data = await fetchRoute(pickupCoords, endCoords);
+          setRouteCoords(data.coords);
+          setDistance(data.distance);
+          setDuration(data.duration);
+        } catch (e) {
+          setError("Failed to get route/path. Try different locations.");
+        }
+        setRouteLoading(false);
+      }
+    };
+    getRoute();
+  }, [pickupCoords, endCoords]);
+
+  // Defensive: Ensure nearbyDrivers is always an array
+  useEffect(() => {
+    if (pickupCoords) {
+      fetch(`http://localhost:3002/api/driver/nearby?lat=${pickupCoords.lat}&lng=${pickupCoords.lng}&radius=0.05`)
+        .then(res => res.json())
+        .then(data => setNearbyDrivers(Array.isArray(data) ? data : []))
+        .catch(() => setNearbyDrivers([]));
+    } else {
+      setNearbyDrivers([]);
+    }
+  }, [pickupCoords]);
+
   const handleStartInput = async (e) => {
     const value = e.target.value;
     setStartLocation(value);
@@ -40,7 +128,6 @@ const RequestRidePage = () => {
     }
   };
 
-  // Autocomplete for end
   const handleEndInput = async (e) => {
     const value = e.target.value;
     setEndLocation(value);
@@ -54,7 +141,6 @@ const RequestRidePage = () => {
     }
   };
 
-  // User picks from suggestion
   const selectStartSuggestion = (s) => {
     setStartLocation(s.display_name);
     setPickupCoords({ lat: parseFloat(s.lat), lng: parseFloat(s.lon) });
@@ -69,7 +155,6 @@ const RequestRidePage = () => {
     setShowSuggestions(s => ({ ...s, end: false }));
   };
 
-  // Use browser geolocation for pickup
   const handleUseCurrent = () => {
     if (!navigator.geolocation) {
       setError("Geolocation not supported");
@@ -89,13 +174,17 @@ const RequestRidePage = () => {
     );
   };
 
-  // Submit the request
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
     setSubmitting(true);
     try {
       const token = localStorage.getItem("token");
+      if (!token) {
+        setError("Please log in to request a ride.");
+        setSubmitting(false);
+        return;
+      }
       const body = {
         start_location: startLocation,
         end_location: endLocation,
@@ -104,12 +193,11 @@ const RequestRidePage = () => {
         end_latitude: endCoords?.lat,
         end_longitude: endCoords?.lng,
       };
-
       const res = await fetch("http://localhost:3002/request-ride", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: token ? `Bearer ${token}` : undefined,
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify(body),
       });
@@ -117,7 +205,7 @@ const RequestRidePage = () => {
       const data = await res.json();
       if (res.ok) {
         alert("Ride requested! Your request ID: " + data.request_id);
-        navigate("/rider/home");
+        navigate(`/ride/${data.ride_id}/rider-sim`);
       } else {
         setError(data.message || "Failed to request ride");
       }
@@ -127,16 +215,34 @@ const RequestRidePage = () => {
     setSubmitting(false);
   };
 
-  // Make marker draggable for pickup point fine-tuning
   const onMarkerDragEnd = (e) => {
     const marker = e.target;
     const position = marker.getLatLng();
     setPickupCoords({ lat: position.lat, lng: position.lng });
   };
 
-  // Hide suggestions on blur after small delay to allow click
   const blurSuggestions = (type) => {
     setTimeout(() => setShowSuggestions(s => ({ ...s, [type]: false })), 150);
+  };
+
+  function FlyToRoute({ routeCoords }) {
+    const map = useMap();
+    useEffect(() => {
+      if (routeCoords && routeCoords.length > 1) {
+        map.fitBounds(routeCoords, { padding: [25, 25] });
+      }
+    }, [routeCoords, map]);
+    return null;
+  }
+
+  const formatDuration = (sec) => {
+    if (!sec) return "";
+    const min = Math.floor(sec / 60);
+    const remSec = Math.round(sec % 60);
+    if (min < 60) return `${min} min${min !== 1 ? "s" : ""} ${remSec}s`;
+    const hr = Math.floor(min / 60);
+    const min2 = min % 60;
+    return `${hr}h ${min2}min`;
   };
 
   return (
@@ -219,9 +325,9 @@ const RequestRidePage = () => {
         {pickupCoords && (
           <div style={{ margin: "20px 0" }}>
             <MapContainer
-              center={[pickupCoords.lat, pickupCoords.lng]}
-              zoom={15}
-              style={{ height: "240px", width: "100%", borderRadius: 8 }}
+              center={pickupCoords}
+              zoom={13}
+              style={{ height: "260px", width: "100%", borderRadius: 8 }}
             >
               <TileLayer
                 url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -233,16 +339,53 @@ const RequestRidePage = () => {
                 eventHandlers={{
                   dragend: onMarkerDragEnd
                 }}
+                icon={startIcon}
               >
-                <Popup>Drag to adjust pickup point</Popup>
+                <Popup>Pickup location (drag to adjust)</Popup>
               </Marker>
-              {/* Optionally show end marker */}
               {endCoords && (
-                <Marker position={[endCoords.lat, endCoords.lng]}>
-                  <Popup>Destination</Popup>
+                <Marker position={[endCoords.lat, endCoords.lng]} icon={endIcon}>
+                  <Popup>Dropoff location</Popup>
                 </Marker>
               )}
+              {routeCoords.length > 1 && (
+                <>
+                  <Polyline
+                    positions={routeCoords}
+                    pathOptions={{ color: "#1976d2", weight: 6, opacity: 0.7 }}
+                  />
+                  <FlyToRoute routeCoords={routeCoords} />
+                </>
+              )}
+              {Array.isArray(nearbyDrivers) && nearbyDrivers.map(driver =>
+                driver.current_latitude && driver.current_longitude ? (
+                  <Marker
+                    key={driver.driver_id}
+                    position={[driver.current_latitude, driver.current_longitude]}
+                    icon={driverIcon}
+                  >
+                    <Popup>Driver #{driver.driver_id}</Popup>
+                  </Marker>
+                ) : null
+              )}
             </MapContainer>
+            {routeLoading && (
+              <div style={{ textAlign: "center", margin: 8 }}>Calculating route...</div>
+            )}
+            {!routeLoading && distance && duration && (
+              <div style={{
+                marginTop: 12,
+                textAlign: "center",
+                background: "#f5f5f5",
+                borderRadius: 8,
+                padding: "10px 6px",
+                fontSize: 16
+              }}>
+                <b>Estimated distance:</b> {(distance / 1000).toFixed(2)} km
+                <br />
+                <b>Estimated time:</b> {formatDuration(duration)}
+              </div>
+            )}
           </div>
         )}
 
@@ -252,7 +395,7 @@ const RequestRidePage = () => {
 
         <button
           type="submit"
-          disabled={submitting}
+          disabled={submitting || !pickupCoords || !endCoords}
           style={{
             width: "100%",
             padding: "12px 0",
@@ -262,7 +405,7 @@ const RequestRidePage = () => {
             fontSize: 17,
             fontWeight: 600,
             border: "none",
-            cursor: "pointer",
+            cursor: (submitting || !pickupCoords || !endCoords) ? "not-allowed" : "pointer",
             boxShadow: "0 2px 8px #dde3f0",
             marginTop: 18
           }}
@@ -303,7 +446,7 @@ const suggestionBoxStyle = {
   background: "#fff",
   border: "1px solid #ddd",
   borderRadius: 4,
-  zIndex: 20,
+  zIndex: 9999,
   width: "100%",
   maxHeight: 160,
   overflowY: "auto",

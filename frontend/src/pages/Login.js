@@ -1,5 +1,3 @@
-// src/pages/Login.js
-
 import React, { useState } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
@@ -30,11 +28,11 @@ const Login = () => {
         password,
       });
 
-      // JWT Token!
+      
       if (res.data.token) {
         localStorage.setItem('token', res.data.token);
 
-        // Optionally decode JWT to get rid/role (or rely on backend for `/profile`)
+        
         const payload = JSON.parse(atob(res.data.token.split('.')[1]));
         localStorage.setItem('rid', payload.rid);
         localStorage.setItem('role', payload.role);
@@ -69,7 +67,6 @@ const Login = () => {
       overflow: "hidden",
       fontFamily: "inherit"
     }}>
-      {/* Rider Panel */}
       <div
         onClick={() => setRole("Rider")}
         style={{
@@ -104,7 +101,6 @@ const Login = () => {
         </div>
       </div>
 
-      {/* Driver Panel */}
       <div
         onClick={() => setRole("Driver")}
         style={{
@@ -139,7 +135,7 @@ const Login = () => {
         </div>
       </div>
 
-      {/* Sliding Login Form */}
+      
       <div style={{
         position: "fixed",
         top: 0,
