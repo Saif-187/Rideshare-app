@@ -3,7 +3,6 @@ import { useParams, useNavigate } from "react-router-dom";
 import { MapContainer, TileLayer, Marker, Popup, Polyline } from "react-leaflet";
 import L from "leaflet";
 
-// Icons
 const carIcon = new L.DivIcon({
   className: "",
   html: `<svg width="34" height="34" viewBox="0 0 36 36">
@@ -32,156 +31,169 @@ const dropoffIcon = new L.DivIcon({
   iconAnchor: [17, 34],
 });
 
-function interpolatePosition(start, end, progress) {
-  return {
-    lat: start.lat + (end.lat - start.lat) * progress,
-    lng: start.lng + (end.lng - start.lng) * progress,
-  };
-}
+// ✅ CORRECT! Use your backend:
+const fetchRoute = async (start, end) => {
+  if (!start || !end) return [];
+  const res = await fetch("http://localhost:3002/api/directions", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ start, end }),
+  });
+  if (!res.ok) return [];
+  const data = await res.json();
+  // Defensive: check if features exist
+  if (!data.features || !data.features[0]) return [];
+  return data.features[0].geometry.coordinates.map(([lng, lat]) => [lat, lng]);
+};
 
-const POLL_INTERVAL = 2000; // ms
 
 const DriverSimulationPage = () => {
   const { rideId } = useParams();
   const navigate = useNavigate();
+
   const [ride, setRide] = useState(null);
   const [driverPos, setDriverPos] = useState(null);
-  const [step, setStep] = useState("pending");
-  const [progress, setProgress] = useState(0);
-  const intervalRef = useRef();
+  const [routeToPickup, setRouteToPickup] = useState([]);
+  const [routeToDropoff, setRouteToDropoff] = useState([]);
+  const [simStatus, setSimStatus] = useState("pending");
+  const [animating, setAnimating] = useState(false);
+  const animationId = useRef(null);
 
-  // Poll ride status and driver location
+  // Only fetch ride ONCE, and never overwrite once started
+  const hasStartedMoving = useRef(false);
+
   useEffect(() => {
-    function poll() {
-      fetch(`http://localhost:3002/ride-status/${rideId}`)
-        .then(res => res.json())
-        .then(data => {
-          setRide(data);
-          setStep(data.status); // 'pending', 'accepted', 'picked_up', 'on_the_way', 'finished'
-          if (data.driver) setDriverPos({ lat: data.driver.lat, lng: data.driver.lng });
-        });
-    }
-    poll();
-    intervalRef.current = setInterval(poll, POLL_INTERVAL);
-    return () => clearInterval(intervalRef.current);
+    fetch(`http://localhost:3002/ride-status/${rideId}`)
+      .then(res => res.json())
+      .then(data => {
+        setRide(data);
+        if (data.driver && !hasStartedMoving.current) {
+          setDriverPos({ lat: data.driver.lat, lng: data.driver.lng });
+          setSimStatus("to_pickup");
+        }
+      });
   }, [rideId]);
 
-  // Simulate movement (DRIVES AND PATCHES STATUS)
+  // When ready, fetch route to pickup
   useEffect(() => {
-    let anim;
-    if (
-      ride &&
-      driverPos &&
-      (step === "accepted" || step === "on_the_way") &&
-      ride.start &&
-      ride.end
-    ) {
-      let from, to, targetStatus;
-      if (step === "accepted") {
-        from = driverPos;
-        to = ride.start;
-        targetStatus = "picked_up";
-      } else if (step === "on_the_way") {
-        from = driverPos;
-        to = ride.end;
-        targetStatus = "finished";
-      } else {
-        return;
-      }
-      let t = 0;
-      anim = setInterval(() => {
-        t += 0.04;
-        if (t >= 1) {
-          setProgress(1);
-          clearInterval(anim);
-          // PATCH status advance
-          fetch("http://localhost:3002/ride-status", {
-            method: "PATCH",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
-            },
-            body: JSON.stringify({ ride_id: rideId, status: targetStatus }),
-          }).then(() => setStep(targetStatus));
-        } else {
-          setProgress(t);
-          const nextPos = interpolatePosition(from, to, t);
-          setDriverPos(nextPos);
-          // PATCH driver location to backend (with JWT)
-          fetch("http://localhost:3002/api/driver/location", {
-            method: "PATCH",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
-            },
-            body: JSON.stringify({
-              lat: nextPos.lat,
-              lng: nextPos.lng,
-            }),
-          });
-        }
-      }, 300);
-    }
-    return () => clearInterval(anim);
-  }, [step, ride, driverPos, rideId]);
+    if (!ride || !driverPos || !ride.start || simStatus !== "to_pickup") return;
+    fetchRoute(driverPos, ride.start).then(path => {
+      setRouteToPickup(path);
+    });
+  }, [ride, driverPos, simStatus]);
 
-  if (!ride) return <div>Loading simulation...</div>;
+  // Animate to pickup
+  useEffect(() => {
+    if (simStatus !== "to_pickup" || routeToPickup.length < 2 || animating) return;
+    setAnimating(true);
+    hasStartedMoving.current = true;
+    let i = 0;
+    setDriverPos({ lat: routeToPickup[0][0], lng: routeToPickup[0][1] });
+    animationId.current = setInterval(() => {
+      i++;
+      if (i < routeToPickup.length) {
+        setDriverPos({ lat: routeToPickup[i][0], lng: routeToPickup[i][1] });
+      } else {
+        clearInterval(animationId.current);
+        fetch("http://localhost:3002/ride-status", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ride_id: rideId, status: "picked_up" }),
+        });
+        setTimeout(() => {
+          setSimStatus("picked_up");
+          setAnimating(false);
+        }, 700);
+      }
+    }, 45);
+    return () => clearInterval(animationId.current);
+  }, [simStatus, routeToPickup, animating, rideId]);
+
+  // After pickup, fetch route to dropoff
+  useEffect(() => {
+    if (simStatus !== "picked_up" || !ride || !ride.start || !ride.end) return;
+    setTimeout(async () => {
+      const path = await fetchRoute(ride.start, ride.end);
+      setRouteToDropoff(path);
+      setSimStatus("to_dropoff");
+    }, 600);
+  }, [simStatus, ride]);
+
+  // Animate to dropoff
+  useEffect(() => {
+    if (simStatus !== "to_dropoff" || routeToDropoff.length < 2 || animating) return;
+    setAnimating(true);
+    let i = 0;
+    setDriverPos({ lat: routeToDropoff[0][0], lng: routeToDropoff[0][1] });
+    animationId.current = setInterval(() => {
+      i++;
+      if (i < routeToDropoff.length) {
+        setDriverPos({ lat: routeToDropoff[i][0], lng: routeToDropoff[i][1] });
+      } else {
+        clearInterval(animationId.current);
+        fetch("http://localhost:3002/ride-status", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ride_id: rideId, status: "completed" }),
+        });
+        setTimeout(() => {
+          setSimStatus("completed");
+          setAnimating(false);
+        }, 400);
+      }
+    }, 45);
+    return () => clearInterval(animationId.current);
+  }, [simStatus, routeToDropoff, animating, rideId]);
+
+  // Clean up on unmount
+  useEffect(() => {
+    return () => {
+      if (animationId.current) clearInterval(animationId.current);
+    };
+  }, []);
+
+  if (!ride || !driverPos) return <div>Loading simulation...</div>;
 
   return (
     <div style={{ maxWidth: 700, margin: "36px auto", padding: 24, background: "#fff", borderRadius: 12, boxShadow: "0 2px 8px #dde3f0" }}>
       <h2 style={{ textAlign: "center" }}>Driver Journey Simulation</h2>
       <div style={{ margin: "22px 0" }}>
         <b>Status:</b>{" "}
-        {step === "pending" && "Waiting for acceptance"}
-        {step === "accepted" && "Driving to pickup..."}
-        {step === "picked_up" && "Waiting at pickup point"}
-        {step === "on_the_way" && "Driving to dropoff..."}
-        {step === "finished" && "Ride complete!"}
+        {simStatus === "pending" && "Loading..."}
+        {simStatus === "to_pickup" && "Driving to pickup..."}
+        {simStatus === "picked_up" && "Waiting at pickup point..."}
+        {simStatus === "to_dropoff" && "Driving to dropoff..."}
+        {simStatus === "completed" && "Ride complete!"}
       </div>
       <div style={{ height: 420, borderRadius: 10, overflow: "hidden" }}>
-        {ride.start && ride.end && driverPos &&
-          <MapContainer
-            center={driverPos}
-            zoom={14}
-            style={{ height: "100%", width: "100%" }}>
-            <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-            <Marker position={[ride.start.lat, ride.start.lng]} icon={pickupIcon}>
-              <Popup>Pickup</Popup>
-            </Marker>
-            <Marker position={[ride.end.lat, ride.end.lng]} icon={dropoffIcon}>
-              <Popup>Dropoff</Popup>
-            </Marker>
-            <Marker position={[driverPos.lat, driverPos.lng]} icon={carIcon}>
-              <Popup>Driver</Popup>
-            </Marker>
-            {/* Show line to next target */}
-            <Polyline positions={
-              step === "on_the_way"
-                ? [[driverPos.lat, driverPos.lng], [ride.end.lat, ride.end.lng]]
-                : [[driverPos.lat, driverPos.lng], [ride.start.lat, ride.start.lng]]
-            } color="#1976d2" />
-          </MapContainer>
-        }
+        <MapContainer
+          center={driverPos}
+          zoom={14}
+          style={{ height: "100%", width: "100%" }}>
+          <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+          <Marker position={[ride.start.lat, ride.start.lng]} icon={pickupIcon}>
+            <Popup>Pickup</Popup>
+          </Marker>
+          <Marker position={[ride.end.lat, ride.end.lng]} icon={dropoffIcon}>
+            <Popup>Dropoff</Popup>
+          </Marker>
+          <Marker key={driverPos ? `${driverPos.lat},${driverPos.lng}` : "driver"}
+                  position={[driverPos.lat, driverPos.lng]} icon={carIcon}>
+            <Popup>Driver</Popup>
+          </Marker>
+          {routeToPickup.length > 1 && simStatus === "to_pickup" && (
+            <Polyline positions={routeToPickup} color="#1976d2" />
+          )}
+          {routeToDropoff.length > 1 && simStatus === "to_dropoff" && (
+            <Polyline positions={routeToDropoff} color="#d32f2f" />
+          )}
+        </MapContainer>
       </div>
       <div style={{ marginTop: 18, textAlign: "center" }}>
-        {step === "picked_up" && (
-          <button
-            style={buttonStyle}
-            onClick={() => {
-              // Advance to 'on_the_way'
-              fetch("http://localhost:3002/ride-status", {
-                method: "PATCH",
-                headers: {
-                  "Content-Type": "application/json",
-                  Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
-                },
-                body: JSON.stringify({ ride_id: rideId, status: "on_the_way" }),
-              }).then(() => setStep("on_the_way"));
-            }}
-          >Start Ride</button>
-        )}
-        {step === "finished" && (
-          <button style={buttonStyle} onClick={() => navigate("/driver/home")}>Back to Home</button>
+        {simStatus === "completed" && (
+          <button style={buttonStyle} onClick={() => navigate("/driver/home")}>
+            Back to Home
+          </button>
         )}
       </div>
     </div>

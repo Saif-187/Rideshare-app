@@ -20,6 +20,29 @@ export const updateDriverLocation = async (req, res) => {
     res.status(500).json({ message: "Failed to update driver location", error: err.message });
   }
 };
+// Already imported: import pool from '../db.js';
+
+export const getRandomDriver = async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT 
+         Driver_ID as driver_id, 
+         Current_Latitude as current_latitude, 
+         Current_Longitude as current_longitude
+       FROM Driver
+       WHERE Current_Latitude IS NOT NULL AND Current_Longitude IS NOT NULL
+       ORDER BY RANDOM()
+       LIMIT 1`
+    );
+    if (!result.rows.length) {
+      return res.status(404).json({ message: "No drivers with valid locations found." });
+    }
+    res.json(result.rows[0]);
+  } catch (err) {
+    res.status(500).json({ message: "Failed to get random driver", error: err.message });
+  }
+};
+
 
 export const getDriverLocation = async (req, res) => {
   try {

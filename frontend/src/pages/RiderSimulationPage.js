@@ -3,21 +3,19 @@ import { useParams, useNavigate } from "react-router-dom";
 import { MapContainer, TileLayer, Marker, Popup, Polyline } from "react-leaflet";
 import L from "leaflet";
 
-// Car/driver icon
+// --- ICONS ---
 const carIcon = new L.DivIcon({
   className: "",
   html: `<svg width="34" height="34" viewBox="0 0 36 36"><circle cx="18" cy="18" r="17" fill="#1976d2" stroke="#fff" stroke-width="3"/><text x="18" y="24" font-size="16" text-anchor="middle" fill="#fff" font-family="Arial" font-weight="bold">&#128663;</text></svg>`,
   iconSize: [34, 34],
   iconAnchor: [17, 34],
 });
-
 const pickupIcon = new L.DivIcon({
   className: "",
   html: `<svg width="34" height="34" viewBox="0 0 36 36"><circle cx="18" cy="18" r="17" fill="#43a047" stroke="#fff" stroke-width="3"/><text x="18" y="24" font-size="16" text-anchor="middle" fill="#fff" font-family="Arial">&#x1F6A9;</text></svg>`,
   iconSize: [34, 34],
   iconAnchor: [17, 34],
 });
-
 const dropoffIcon = new L.DivIcon({
   className: "",
   html: `<svg width="34" height="34" viewBox="0 0 36 36"><circle cx="18" cy="18" r="17" fill="#d32f2f" stroke="#fff" stroke-width="3"/><text x="18" y="24" font-size="18" text-anchor="middle" fill="#fff" font-family="Arial">&#x1F6A9;</text></svg>`,
@@ -25,42 +23,188 @@ const dropoffIcon = new L.DivIcon({
   iconAnchor: [17, 34],
 });
 
+const ORS_API_KEY = "5b3ce3597851110001cf6248159fb5b9de2a4436a27aa58dcf630560";
+
+const fetchRoute = async (start, end) => {
+  if (!start || !end || !("lat" in start) || !("lng" in start) || !("lat" in end) || !("lng" in end)) {
+    return [];
+  }
+  const url = "https://api.openrouteservice.org/v2/directions/driving-car/geojson";
+  const body = {
+    coordinates: [
+      [start.lng, start.lat],
+      [end.lng, end.lat]
+    ]
+  };
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Authorization": ORS_API_KEY,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body)
+  });
+  if (!res.ok) return [];
+  const data = await res.json();
+  return data.features[0].geometry.coordinates.map(([lng, lat]) => [lat, lng]);
+};
+
 const RiderSimulationPage = () => {
   const { rideId } = useParams();
   const navigate = useNavigate();
-  const [ride, setRide] = useState(null);
 
-  // Poll ride status and driver location every 3 seconds
+  const [ride, setRide] = useState(null);
+  const [simStatus, setSimStatus] = useState("pending"); // pending, accepted, picked_up, on_the_way, completed
+  const [driverPos, setDriverPos] = useState(null);
+  const [routeToPickup, setRouteToPickup] = useState([]);
+  const [routeToDropoff, setRouteToDropoff] = useState([]);
+  const [error, setError] = useState("");
+
+  // --- This flag is now only for the current animation ---
+  const [animationId, setAnimationId] = useState(null);
+
+  // 1. Load ride info
   useEffect(() => {
-    const poll = () => {
-      fetch(`http://localhost:3002/ride/${rideId}/status`)
-        .then(res => res.json())
-        .then(data => setRide(data));
-    };
-    poll();
-    const interval = setInterval(poll, 3000);
-    return () => clearInterval(interval);
+    fetch(`http://localhost:3002/ride-status/${rideId}`)
+      .then(res => res.json())
+      .then(data => {
+        let startObj = data.start;
+        let endObj = data.end;
+        if (
+          (!startObj || typeof startObj !== "object") &&
+          (data.start_latitude !== undefined && data.start_longitude !== undefined)
+        ) {
+          startObj = { lat: Number(data.start_latitude), lng: Number(data.start_longitude) };
+        }
+        if (
+          (!endObj || typeof endObj !== "object") &&
+          (data.end_latitude !== undefined && data.end_longitude !== undefined)
+        ) {
+          endObj = { lat: Number(data.end_latitude), lng: Number(data.end_longitude) };
+        }
+        if (
+          !startObj || isNaN(startObj.lat) || isNaN(startObj.lng) ||
+          !endObj || isNaN(endObj.lat) || isNaN(endObj.lng)
+        ) {
+          setError("Invalid or missing ride location data from server.");
+        } else {
+          setRide({ ...data, start: startObj, end: endObj });
+          setError("");
+        }
+      })
+      .catch(err => setError("Could not load ride info: " + err.message));
   }, [rideId]);
 
+  // 2. Assign driver and get route to pickup
+  useEffect(() => {
+    if (
+      !ride ||
+      simStatus !== "pending" ||
+      !ride.start ||
+      !ride.end
+    )
+      return;
+
+    const assignDriverTimeout = setTimeout(async () => {
+      try {
+        const res = await fetch("http://localhost:3002/api/driver/random");
+        const driver = await res.json();
+        if (!driver.current_latitude || !driver.current_longitude) {
+          setError("Random driver from backend has no location.");
+          return;
+        }
+        const initialDriver = {
+          lat: driver.current_latitude,
+          lng: driver.current_longitude,
+        };
+        setDriverPos(initialDriver);
+        setSimStatus("accepted");
+        const path = await fetchRoute(initialDriver, ride.start);
+        setRouteToPickup(path);
+      } catch (e) {
+        setError("Failed to get a random driver: " + e.message);
+      }
+    }, 1800);
+    return () => clearTimeout(assignDriverTimeout);
+  }, [ride, simStatus]);
+
+  // 3. Animate driver to pickup
+  useEffect(() => {
+    if (simStatus !== "accepted" || routeToPickup.length < 2) return;
+    // Cancel any previous animation!
+    if (animationId) clearInterval(animationId);
+
+    let i = 0;
+    setDriverPos({ lat: routeToPickup[0][0], lng: routeToPickup[0][1] });
+
+    const id = setInterval(() => {
+      i++;
+      if (i < routeToPickup.length) {
+        setDriverPos({ lat: routeToPickup[i][0], lng: routeToPickup[i][1] });
+      } else {
+        clearInterval(id);
+        setAnimationId(null);
+        setTimeout(() => setSimStatus("picked_up"), 400);
+      }
+    }, 60);
+    setAnimationId(id);
+    return () => clearInterval(id);
+  }, [simStatus, routeToPickup]);
+
+  // 4. After picked_up, get route to dropoff and animate
+  useEffect(() => {
+    if (simStatus !== "picked_up" || !ride) return;
+
+    const startDropoffTimeout = setTimeout(async () => {
+      const path = await fetchRoute(ride.start, ride.end);
+      setRouteToDropoff(path);
+      setSimStatus("on_the_way");
+    }, 1000);
+    return () => clearTimeout(startDropoffTimeout);
+  }, [simStatus, ride]);
+
+  // 5. Animate driver to dropoff
+  useEffect(() => {
+    if (simStatus !== "on_the_way" || routeToDropoff.length < 2) return;
+    if (animationId) clearInterval(animationId);
+
+    let i = 0;
+    setDriverPos({ lat: routeToDropoff[0][0], lng: routeToDropoff[0][1] });
+
+    const id = setInterval(() => {
+      i++;
+      if (i < routeToDropoff.length) {
+        setDriverPos({ lat: routeToDropoff[i][0], lng: routeToDropoff[i][1] });
+      } else {
+        clearInterval(id);
+        setAnimationId(null);
+        setTimeout(() => setSimStatus("completed"), 400);
+      }
+    }, 60);
+    setAnimationId(id);
+    return () => clearInterval(id);
+  }, [simStatus, routeToDropoff]);
+
+  // Clean up any intervals on unmount
+  useEffect(() => {
+    return () => {
+      if (animationId) clearInterval(animationId);
+    };
+  }, [animationId]);
+
+  if (error) return <div style={{ color: "red", padding: 20, fontWeight: 600 }}>{error}</div>;
   if (!ride) return <div>Loading...</div>;
+  if (!ride.start || !ride.end)
+    return <div style={{ color: "red", padding: 20 }}>Ride info not found or invalid start/end location.</div>;
 
-  const hasDriver = ride.driver && ride.status !== "pending";
-
-  // Status text mapping for clarity
   function statusText(status) {
     switch (status) {
-      case "pending":
-        return "Waiting for driver to accept your ride...";
-      case "accepted":
-        return "Driver is on the way to your pickup location";
-      case "picked_up":
-        return "Driver has arrived. Please board the car!";
-      case "on_the_way":
-        return "You are on the way to your destination";
-      case "finished":
-        return "Ride complete!";
-      default:
-        return status;
+      case "pending": return "Looking for drivers nearby...";
+      case "accepted": return "A driver has been assigned and is on the way!";
+      case "picked_up": return "Driver has arrived at pickup point!";
+      case "on_the_way": return "On the way to your destination...";
+      case "completed": return "Ride complete!";
+      default: return status;
     }
   }
 
@@ -68,39 +212,36 @@ const RiderSimulationPage = () => {
     <div style={{ maxWidth: 700, margin: "36px auto", padding: 24, background: "#fff", borderRadius: 12, boxShadow: "0 2px 8px #dde3f0" }}>
       <h2 style={{ textAlign: "center" }}>Your Ride Status</h2>
       <div style={{ margin: "22px 0", fontWeight: 500, color: "#1976d2" }}>
-        {statusText(ride.status)}
+        {statusText(simStatus)}
       </div>
       <div style={{ height: 420, borderRadius: 10, overflow: "hidden" }}>
-        {ride.start && ride.end && (
-          <MapContainer
-            center={ride.start}
-            zoom={14}
-            style={{ height: "100%", width: "100%" }}>
-            <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-            <Marker position={[ride.start.lat, ride.start.lng]} icon={pickupIcon}>
-              <Popup>Pickup Point</Popup>
+        <MapContainer
+          center={[ride.start.lat, ride.start.lng]}
+          zoom={14}
+          style={{ height: "100%", width: "100%" }}>
+          <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+          <Marker position={[ride.start.lat, ride.start.lng]} icon={pickupIcon}>
+            <Popup>Pickup Point</Popup>
+          </Marker>
+          <Marker position={[ride.end.lat, ride.end.lng]} icon={dropoffIcon}>
+            <Popup>Dropoff Point</Popup>
+          </Marker>
+          {driverPos && (
+            <Marker position={[driverPos.lat, driverPos.lng]} icon={carIcon}>
+              <Popup>Driver</Popup>
             </Marker>
-            <Marker position={[ride.end.lat, ride.end.lng]} icon={dropoffIcon}>
-              <Popup>Dropoff Point</Popup>
-            </Marker>
-            {hasDriver && (
-              <>
-                <Marker position={[ride.driver.lat, ride.driver.lng]} icon={carIcon}>
-                  <Popup>Driver</Popup>
-                </Marker>
-                <Polyline positions={[
-                  [ride.driver.lat, ride.driver.lng],
-                  (ride.status === "on_the_way" || ride.status === "finished")
-                    ? [ride.end.lat, ride.end.lng]
-                    : [ride.start.lat, ride.start.lng]
-                ]} color="#1976d2" />
-              </>
-            )}
-          </MapContainer>
-        )}
+          )}
+          {/* Show animated route */}
+          {simStatus === "accepted" && routeToPickup.length > 1 && (
+            <Polyline positions={routeToPickup} color="#1976d2" />
+          )}
+          {simStatus === "on_the_way" && routeToDropoff.length > 1 && (
+            <Polyline positions={routeToDropoff} color="#d32f2f" />
+          )}
+        </MapContainer>
       </div>
       <div style={{ marginTop: 18, textAlign: "center" }}>
-        {ride.status === "finished" && (
+        {simStatus === "completed" && (
           <button style={buttonStyle} onClick={() => navigate("/rider/home")}>
             Back to Home
           </button>
