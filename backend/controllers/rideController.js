@@ -28,21 +28,18 @@ export const requestRide = async (req, res) => {
     );
     const ride_id = rideResult.rows[0].ride_id;
 
-    const reqRes = await pool.query(
-      `INSERT INTO Ride_Request (Request_ID, Ride_ID)
-       VALUES (DEFAULT, $1)
-       RETURNING Request_ID`,
-      [ride_id]
+    // Ride_Request INSERTION is still manual, unless you have a trigger for this as well:
+    await pool.query(
+      `INSERT INTO Ride_Request (Ride_ID) VALUES ($1)`, [ride_id]
     );
-    const request_id = reqRes.rows[0].request_id;
 
     await pool.query(
-      `INSERT INTO Ride_Riders (Ride_Riders_ID, Rider_ID, Ride_ID)
-       VALUES (DEFAULT, $1, $2)`,
+      `INSERT INTO Ride_Riders (Rider_ID, Ride_ID)
+       VALUES ($1, $2)`,
       [rider_id, ride_id]
     );
 
-    res.status(201).json({ message: "Ride requested!", ride_id, request_id });
+    res.status(201).json({ message: "Ride requested!", ride_id });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Error requesting ride", error: err.detail || err.message });
@@ -84,9 +81,7 @@ export const acceptRide = async (req, res) => {
       `UPDATE Ride SET Vehicle_ID = $1, Status = 'accepted' WHERE Ride_ID = $2`,
       [vehicle_id, ride_id]
     );
-    await pool.query(
-      `DELETE FROM Ride_Request WHERE Ride_ID = $1`, [ride_id]
-    );
+    // DO NOT delete from Ride_Request in JS – the trigger will do this!
 
     res.json({ message: "Ride accepted!", ride_id });
   } catch (err) {
@@ -99,7 +94,6 @@ export const acceptRide = async (req, res) => {
 export const updateRideStatus = async (req, res) => {
   try {
     const { ride_id, status } = req.body;
-    // Optionally, you could check that the user is allowed to update (driver/rider)
     await pool.query(
       `UPDATE Ride SET Status = $1 WHERE Ride_ID = $2`,
       [status, ride_id]
